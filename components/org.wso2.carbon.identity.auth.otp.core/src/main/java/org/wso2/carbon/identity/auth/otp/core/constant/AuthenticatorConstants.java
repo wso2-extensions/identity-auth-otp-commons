@@ -38,7 +38,7 @@ public class AuthenticatorConstants {
     public static final String OTP_NUMERIC_CHAR_SET = "9245378016";
     public static final String OTP_ALPHA_NUMERIC_CHAR_SET = "KIGXHOYSPRWCEFMVUQLZDNABJT9245378016";
     public static final String RESEND = "resendCode";
-    public static final String CODE = "OTPCode";
+    public static final String CODE = "OTPcode";
     public static final String OTP_TOKEN = "otpToken";
     public static final String OTP = "otp";
     public static final String OTP_RESEND_ATTEMPTS = "otpResendAttempts";
