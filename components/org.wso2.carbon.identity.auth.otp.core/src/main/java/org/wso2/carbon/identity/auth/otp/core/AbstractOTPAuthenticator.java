@@ -184,9 +184,7 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
                     context.setProperty(IS_IDF_INITIATED_FROM_AUTHENTICATOR, true);
                     return;
                 }
-                /*
-                 * If the request is returned from the Identifier First page, resolve the user and set them in context.
-                 */
+                // If the request is returned from the Identifier First page, resolve the user and set them in context.
                 context.removeProperty(IS_IDF_INITIATED_FROM_AUTHENTICATOR);
                 AuthenticatedUser authenticatedUser = resolveUserFromRequest(request, context);
                 authenticatedUserFromContext = resolveUserFromUserStore(authenticatedUser);
@@ -199,9 +197,7 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
                 authenticatedUserFromContext = resolveUserFromUserStore(authenticatedUserFromContext);
                 setResolvedUserInContext(context, authenticatedUserFromContext);
             }
-            /*
-             * If the authenticated user is still null at this point, then an invalid user is trying to log in.
-             */
+             // If the authenticated user is still null at this point, then an invalid user is trying to log in.
             if (authenticatedUserFromContext == null) {
                 AuthenticatedUser invalidUser = new AuthenticatedUser();
                 invalidUser.setUserName(request.getParameter(USERNAME));
@@ -234,10 +230,10 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
                 mappedLocalUsername, applicationTenantDomain, isInitialFederationAttempt);
         try {
             if (!isInitialFederationAttempt
-                    && AuthenticatorDataHolder.getAccountLockService().isAccountLocked(
-                            authenticatingUser.getUserName(),
-                            authenticatingUser.getTenantDomain(),
-                            authenticatingUser.getUserStoreDomain())
+                && AuthenticatorDataHolder.getAccountLockService().isAccountLocked(
+                    authenticatingUser.getUserName(),
+                    authenticatingUser.getTenantDomain(),
+                    authenticatingUser.getUserStoreDomain())
             ) {
                 handleOTPForLockedUser(authenticatingUser, request, response, context);
                 return;
