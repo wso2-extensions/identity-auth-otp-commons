@@ -115,7 +115,7 @@ public class AuthenticatorConstants {
         ERROR_CODE_OTP_INVALID("65020", "Invalid code provided by user: %s"),
         ERROR_CODE_ERROR_GETTING_FEDERATED_AUTHENTICATOR("65021", "Error occurred while getting IDP: " +
                 "%s from tenant: %s"),
-        ERROR_CODE_INVALID_FEDERATED_AUTHENTICATOR("65022", "No IDP found with the name : " +
+        ERROR_CODE_INVALID_FEDERATED_AUTHENTICATOR("65022", "No IDP found with the name: " +
                 "%s in tenant: %s"),
         ERROR_CODE_NO_CLAIM_CONFIGS_IN_FEDERATED_AUTHENTICATOR("65023", "No claim configurations " +
                 "found in IDP: %s in tenant: %s"),
