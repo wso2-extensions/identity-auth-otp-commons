@@ -263,6 +263,7 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
              */
             try {
                 sendOtp(authenticatedUserFromContext, otp, isInitialFederationAttempt, request, response, context);
+                LOG.debug("OTP code was sent successfully.");
             } catch (AuthenticationFailedException exception) {
                 String errorGettingUserClaimErrorCode = getAuthenticatorErrorPrefix() + "-"
                         + ERROR_CODE_ERROR_GETTING_USER_CLAIM.getCode();
