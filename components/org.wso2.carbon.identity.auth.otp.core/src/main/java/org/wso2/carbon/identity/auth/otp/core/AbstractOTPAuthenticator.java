@@ -180,7 +180,7 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
                  * redirect the user to the Identifier First page to retrieve the username.
                  */
                 if (!isUserRedirectedFromIDF(request)) {
-                    redirectUserToIDF(response, context);
+                    redirectUserToIDF(request, response, context);
                     context.setProperty(IS_IDF_INITIATED_FROM_AUTHENTICATOR, true);
                     return;
                 }
@@ -981,12 +981,13 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
     /**
      * This method is used to redirect the user to the username entering page (IDF: Identifier first).
      *
-     * @param context  The authentication context.
+     * @param request  Request.
      * @param response Response.
+     * @param context  The authentication context.
      * @throws AuthenticationFailedException If an error occurred while setting redirect url.
      */
-    private void redirectUserToIDF(HttpServletResponse response, AuthenticationContext context)
-            throws AuthenticationFailedException {
+    private void redirectUserToIDF(HttpServletRequest request, HttpServletResponse response,
+                                   AuthenticationContext context) throws AuthenticationFailedException {
 
         StringBuilder redirectUrl = new StringBuilder();
         String loginPage = ConfigurationFacade.getInstance().getAuthenticationEndpointURL();
@@ -994,6 +995,7 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
         redirectUrl.append("?");
 
         String queryParams = context.getContextIdIncludedQueryParams();
+        String multiOptionURI = AuthenticatorUtils.getMultiOptionURIQueryString(request);
         try {
             LOG.debug("Redirecting to identifier first flow since no authenticated user was found");
             if (queryParams != null) {
@@ -1004,6 +1006,7 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
             redirectUrl.append(IDF_HANDLER_NAME);
             redirectUrl.append(":");
             redirectUrl.append(LOCAL_AUTHENTICATOR);
+            redirectUrl.append(multiOptionURI);
             response.sendRedirect(redirectUrl.toString());
         } catch (IOException e) {
             throw handleAuthErrorScenario(ERROR_CODE_ERROR_REDIRECTING_TO_IDF_PAGE);
