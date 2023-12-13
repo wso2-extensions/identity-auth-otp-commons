@@ -18,6 +18,7 @@
 
 package org.wso2.carbon.identity.auth.otp.core.util;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.owasp.encoder.Encode;
 
 import javax.servlet.http.HttpServletRequest;
@@ -35,6 +36,7 @@ public class AuthenticatorUtils {
      * @param request HttpServletRequest.
      * @return Query parameter for the multi option URI.
      */
+    @SuppressFBWarnings("UNVALIDATED_REDIRECT")
     public static String getMultiOptionURIQueryString(HttpServletRequest request) {
 
         String multiOptionURI = "";

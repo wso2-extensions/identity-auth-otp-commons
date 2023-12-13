@@ -18,6 +18,7 @@
 
 package org.wso2.carbon.identity.auth.otp.core;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.math.NumberUtils;
 import org.apache.commons.logging.Log;
@@ -986,6 +987,7 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
      * @param context  The authentication context.
      * @throws AuthenticationFailedException If an error occurred while setting redirect url.
      */
+    @SuppressFBWarnings("UNVALIDATED_REDIRECT")
     private void redirectUserToIDF(HttpServletRequest request, HttpServletResponse response,
                                    AuthenticationContext context) throws AuthenticationFailedException {
 
