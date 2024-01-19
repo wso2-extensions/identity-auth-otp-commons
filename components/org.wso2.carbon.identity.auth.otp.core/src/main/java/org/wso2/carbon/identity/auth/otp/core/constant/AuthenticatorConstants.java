@@ -42,6 +42,7 @@ public class AuthenticatorConstants {
     public static final String OTP_TOKEN = "otpToken";
     public static final String OTP = "otp";
     public static final String OTP_RESEND_ATTEMPTS = "otpResendAttempts";
+    public static final String ERROR_CODE_MISSING_SMS_SENDER = "40001";
 
     // Query params.
     public static final String AUTHENTICATORS_QUERY_PARAM = "&authenticators=";
@@ -50,6 +51,8 @@ public class AuthenticatorConstants {
             "&authFailure=true&authFailureMsg=user.account.locked";
     public static final String ERROR_USER_CLAIM_NOT_FOUND_QUERY_PARAMS =
             "&authFailure=true&authFailureMsg=user.claim.not.found";
+    public static final String ERROR_USER_MOBILE_NUMBER_MISSING =
+            "&authFailure=true&authFailureMsg=user.mobile.not.found";
     public static final String ERROR_USER_RESEND_COUNT_EXCEEDED_QUERY_PARAMS =
             "&authFailure=true&authFailureMsg=resent.count.exceeded";
     public static final String SCREEN_VALUE_QUERY_PARAM = "&screenValue=";
@@ -127,7 +130,8 @@ public class AuthenticatorConstants {
         ERROR_CODE_CONNECTING_THROTTLER_SERVICE("65028", "Error connecting throttler service"),
         ERROR_CODE_ERROR_REDIRECTING_TO_IDF_PAGE("65029", "Error while redirecting to the login page."),
         ERROR_CODE_ERROR_GETTING_USER_CLAIM("65030",
-                "Error occurred while getting the claim %s for user: %s");
+                "Error occurred while getting the claim %s for user: %s"),
+        ERROR_CODE_NO_MOBILE_NUMBER_FOUND("65031", "No mobile number found for user: %s");
 
         private final String code;
         private final String message;

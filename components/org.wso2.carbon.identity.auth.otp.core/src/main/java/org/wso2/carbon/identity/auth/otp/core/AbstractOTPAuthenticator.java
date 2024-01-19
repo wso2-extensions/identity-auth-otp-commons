@@ -83,8 +83,10 @@ import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConst
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.DEFAULT_OTP_LENGTH;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.DEFAULT_OTP_RESEND_ATTEMPTS;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.DEFAULT_OTP_VALIDITY_IN_MILLIS;
+import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.ERROR_CODE_MISSING_SMS_SENDER;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.ERROR_USER_ACCOUNT_LOCKED_QUERY_PARAMS;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.ERROR_USER_CLAIM_NOT_FOUND_QUERY_PARAMS;
+import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.ERROR_USER_MOBILE_NUMBER_MISSING;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.ERROR_USER_RESEND_COUNT_EXCEEDED_QUERY_PARAMS;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.ErrorMessages.ERROR_CODE_EMPTY_OTP_CODE;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.ErrorMessages.ERROR_CODE_EMPTY_USERNAME;
@@ -100,6 +102,7 @@ import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConst
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.ErrorMessages.ERROR_CODE_GETTING_ACCOUNT_STATE;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.ErrorMessages.ERROR_CODE_INVALID_FEDERATED_AUTHENTICATOR;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.ErrorMessages.ERROR_CODE_NO_FEDERATED_USER;
+import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.ErrorMessages.ERROR_CODE_NO_MOBILE_NUMBER_FOUND;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.ErrorMessages.ERROR_CODE_NO_USER_FOUND;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.ErrorMessages.ERROR_CODE_OTP_EXPIRED;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.ErrorMessages.ERROR_CODE_OTP_INVALID;
@@ -268,6 +271,8 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
             } catch (AuthenticationFailedException exception) {
                 String errorGettingUserClaimErrorCode = getAuthenticatorErrorPrefix() + "-"
                         + ERROR_CODE_ERROR_GETTING_USER_CLAIM.getCode();
+                String errorUserMobileNumberMissing = getAuthenticatorErrorPrefix() + "-"
+                        + ERROR_CODE_NO_MOBILE_NUMBER_FOUND.getCode();
                 if (errorGettingUserClaimErrorCode.equals(exception.getErrorCode())) {
                     if (isOTPAsFirstFactor(context)) {
                         redirectToOTPLoginPage(authenticatedUserFromContext, applicationTenantDomain,
@@ -279,6 +284,12 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
                         redirectToErrorPage(request, response, context, queryParams,
                                 ERROR_USER_CLAIM_NOT_FOUND_QUERY_PARAMS);
                     }
+                    return;
+                } else if (errorUserMobileNumberMissing.equals(exception.getErrorCode())) {
+                    String queryParams = FrameworkUtils.getQueryStringWithFrameworkContextId(
+                            context.getQueryParams(), context.getCallerSessionKey(),
+                            context.getContextIdentifier());
+                    redirectToErrorPage(request, response, context, queryParams, ERROR_USER_MOBILE_NUMBER_MISSING);
                     return;
                 } else {
                     throw exception;
@@ -975,6 +986,9 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
         try {
             AuthenticatorDataHolder.getIdentityEventService().handleEvent(identityMgtEvent);
         } catch (IdentityEventException e) {
+            if (e.getErrorCode().equals(ERROR_CODE_MISSING_SMS_SENDER)) {
+                throw handleAuthErrorScenario(ERROR_CODE_NO_MOBILE_NUMBER_FOUND, e, user.getLoggableUserId());
+            }
             throw handleAuthErrorScenario(ERROR_CODE_ERROR_TRIGGERING_EVENT, e, eventName, user.getUserName());
         }
     }
