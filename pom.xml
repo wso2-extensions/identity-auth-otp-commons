@@ -203,7 +203,7 @@
         <carbon.kernel.version>4.9.10</carbon.kernel.version>
         <carbon.kernel.package.import.version.range>[4.6.0, 5.0.0)</carbon.kernel.package.import.version.range>
         <carbon.identity.framework.version>5.25.285</carbon.identity.framework.version>
-        <carbon.identity.framework.imp.pkg.version.range>[5.20.90, 7.0.0)</carbon.identity.framework.imp.pkg.version.range>
+        <carbon.identity.framework.imp.pkg.version.range>[5.20.90, 8.0.0)</carbon.identity.framework.imp.pkg.version.range>
         <identity.extension.utils>1.0.12</identity.extension.utils>
         <identity.extension.utils.import.version.range>[1.0.8,2.0.0)</identity.extension.utils.import.version.range>
         <identity.governance.version>1.8.58</identity.governance.version>
