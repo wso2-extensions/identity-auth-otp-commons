@@ -986,7 +986,7 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
         try {
             AuthenticatorDataHolder.getIdentityEventService().handleEvent(identityMgtEvent);
         } catch (IdentityEventException e) {
-            if (e.getErrorCode().equals(ERROR_CODE_MISSING_SMS_SENDER)) {
+            if (ERROR_CODE_MISSING_SMS_SENDER.equals(e.getErrorCode())) {
                 throw handleAuthErrorScenario(ERROR_CODE_NO_MOBILE_NUMBER_FOUND, e, user.getLoggableUserId());
             }
             throw handleAuthErrorScenario(ERROR_CODE_ERROR_TRIGGERING_EVENT, e, eventName, user.getUserName());
