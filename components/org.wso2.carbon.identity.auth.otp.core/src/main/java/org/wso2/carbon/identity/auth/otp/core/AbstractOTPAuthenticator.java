@@ -191,14 +191,14 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
                 // If the request is returned from the Identifier First page, resolve the user and set them in context.
                 context.removeProperty(IS_IDF_INITIATED_FROM_AUTHENTICATOR);
                 AuthenticatedUser authenticatedUser = resolveUserFromRequest(request, context);
-                authenticatedUserFromContext = resolveUserFromUserStore(authenticatedUser);
+                authenticatedUserFromContext = resolveUserFromUserStore(authenticatedUser, context);
                 setResolvedUserInContext(context, authenticatedUserFromContext);
             } else if (isPreviousIdPAuthenticationFlowHandler(context)) {
                 /*
                  * If the previous authentication has only been done by AuthenticationFlowHandlers, need to check if the
                  * user exists in the database.
                  */
-                authenticatedUserFromContext = resolveUserFromUserStore(authenticatedUserFromContext);
+                authenticatedUserFromContext = resolveUserFromUserStore(authenticatedUserFromContext, context);
                 setResolvedUserInContext(context, authenticatedUserFromContext);
             }
              // If the authenticated user is still null at this point, then an invalid user is trying to log in.
@@ -1083,10 +1083,11 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
      * @return Authenticated user retrieved from the user store.
      * @throws AuthenticationFailedException In occasions of failing.
      */
-    private AuthenticatedUser resolveUserFromUserStore(AuthenticatedUser authenticatedUser)
+    private AuthenticatedUser resolveUserFromUserStore(AuthenticatedUser authenticatedUser,
+                                                       AuthenticationContext context)
             throws AuthenticationFailedException {
 
-        User user = getUser(authenticatedUser);
+        User user = getUser(authenticatedUser, context);
         if (user == null) {
             return null;
         }
