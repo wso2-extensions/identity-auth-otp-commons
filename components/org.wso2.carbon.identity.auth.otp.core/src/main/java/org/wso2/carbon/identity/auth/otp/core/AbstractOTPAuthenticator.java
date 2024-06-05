@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, WSO2 LLC. (https://www.wso2.com).
+ * Copyright (c) 2023-2024, WSO2 LLC. (http://www.wso2.com).
  *
  * WSO2 LLC. licenses this file to you under the Apache License,
  * Version 2.0 (the "License"); you may not use this file except
@@ -244,7 +244,8 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
             }
         } catch (AccountLockServiceException e) {
             String error = String.format(
-                    ERROR_CODE_GETTING_ACCOUNT_STATE.getMessage(), authenticatingUser.getUserName());
+                    ERROR_CODE_GETTING_ACCOUNT_STATE.getMessage(),
+                    AuthenticatorUtils.maskIfRequired(authenticatedUserFromContext.getUserName()));
             throw new AuthenticationFailedException(ERROR_CODE_GETTING_ACCOUNT_STATE.getCode(), error, e);
         }
         AuthenticatorConstants.AuthenticationScenarios scenario = resolveScenario(request, context);
@@ -332,7 +333,8 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
                     && AuthenticatorDataHolder.getAccountLockService().isAccountLocked(
                     authenticatingUser.getUserName(), authenticatingUser.getTenantDomain(),
                     authenticatingUser.getUserStoreDomain())) {
-                throw handleAuthErrorScenario(ERROR_CODE_USER_ACCOUNT_LOCKED, authenticatingUser.getUserName());
+                throw handleAuthErrorScenario(ERROR_CODE_USER_ACCOUNT_LOCKED,
+                        AuthenticatorUtils.maskIfRequired(authenticatingUser.getUserName()));
             }
         } catch (AccountLockServiceException e) {
             throw handleAuthErrorScenario(ERROR_CODE_GETTING_ACCOUNT_STATE, e);
@@ -341,12 +343,12 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
         /* If user requests a resend, throw error */
         if (Boolean.parseBoolean(request.getParameter(RESEND))) {
             throw handleInvalidCredentialsScenario(ERROR_CODE_RETRYING_OTP_RESEND,
-                    authenticatedUserFromContext.getUserName());
+                    AuthenticatorUtils.maskIfRequired(authenticatedUserFromContext.getUserName()));
         }
         /* If an empty code is received, throw error. */
         if (StringUtils.isBlank(request.getParameter(CODE))) {
             throw handleInvalidCredentialsScenario(ERROR_CODE_EMPTY_OTP_CODE,
-                    authenticatedUserFromContext.getUserName());
+                    AuthenticatorUtils.maskIfRequired(authenticatedUserFromContext.getUserName()));
         }
         boolean isSuccessfulAttempt = isSuccessfulAuthAttempt(request.getParameter(CODE), authenticatingUser, context);
         OTP otpInContext = (OTP) context.getParameter(OTP);
@@ -374,11 +376,13 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
         if (otpInContext != null && otpInContext.isExpired()) {
             publishPostOTPValidatedEvent(otpInContext, authenticatedUserFromContext, false,
                     true, request, context);
-            throw handleAuthErrorScenario(ERROR_CODE_OTP_EXPIRED, authenticatedUserFromContext.getUserName());
+            throw handleAuthErrorScenario(ERROR_CODE_OTP_EXPIRED,
+                    AuthenticatorUtils.maskIfRequired(authenticatedUserFromContext.getUserName()));
         } else {
             publishPostOTPValidatedEvent(otpInContext, authenticatedUserFromContext, false,
                     false, request, context);
-            throw handleAuthErrorScenario(ERROR_CODE_OTP_INVALID, authenticatedUserFromContext.getUserName());
+            throw handleAuthErrorScenario(ERROR_CODE_OTP_INVALID,
+                    AuthenticatorUtils.maskIfRequired(authenticatedUserFromContext.getUserName()));
         }
     }
 
@@ -447,7 +451,7 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
                             authenticatedUser.toFullQualifiedUsername()), new String[]{claimUri}, null);
             return claimValues.get(claimUri);
         } catch (UserStoreException e) {
-            throw handleAuthErrorScenario(error, e, authenticatedUser.getUserName());
+            throw handleAuthErrorScenario(error, e, AuthenticatorUtils.maskIfRequired(authenticatedUser.getUserName()));
         }
     }
 
@@ -474,7 +478,8 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
             }
             return ((AbstractUserStoreManager) userStoreManager).getSecondaryUserStoreManager(userStoreDomain);
         } catch (UserStoreException e) {
-            throw handleAuthErrorScenario(ERROR_CODE_ERROR_GETTING_USER_STORE_MANAGER, e, username);
+            throw handleAuthErrorScenario(ERROR_CODE_ERROR_GETTING_USER_STORE_MANAGER, e,
+                    AuthenticatorUtils.maskIfRequired(username));
         }
     }
 
@@ -805,7 +810,8 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
 
         OTP otpInfoInContext = (OTP) context.getProperty(OTP);
         if (StringUtils.isBlank(userToken)) {
-            throw handleAuthErrorScenario(ERROR_CODE_EMPTY_OTP_CODE, user.getUserName());
+            throw handleAuthErrorScenario(ERROR_CODE_EMPTY_OTP_CODE,
+                    AuthenticatorUtils.maskIfRequired(user.getUserName()));
         }
         if (otpInfoInContext == null || StringUtils.isBlank(otpInfoInContext.getValue())) {
             return false;
@@ -989,7 +995,8 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
             if (ERROR_CODE_MISSING_SMS_SENDER.equals(e.getErrorCode())) {
                 throw handleAuthErrorScenario(ERROR_CODE_NO_MOBILE_NUMBER_FOUND, e, user.getLoggableUserId());
             }
-            throw handleAuthErrorScenario(ERROR_CODE_ERROR_TRIGGERING_EVENT, e, eventName, user.getUserName());
+            throw handleAuthErrorScenario(ERROR_CODE_ERROR_TRIGGERING_EVENT, e, eventName,
+                    AuthenticatorUtils.maskIfRequired(user.getUserName()));
         }
     }
 
