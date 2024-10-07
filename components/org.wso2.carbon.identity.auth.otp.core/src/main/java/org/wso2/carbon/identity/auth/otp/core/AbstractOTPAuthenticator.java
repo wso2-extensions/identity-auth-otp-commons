@@ -63,6 +63,7 @@ import org.wso2.carbon.utils.multitenancy.MultitenantUtils;
 
 import java.io.IOException;
 import java.security.SecureRandom;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -727,6 +728,12 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
             }
         }
         if (context.isRetrying() && !Boolean.parseBoolean(request.getParameter(RESEND))) {
+            String remainingNumberOfOtpAttemptsQueryParam = getRemainingNumberOfOtpAttemptsQueryParam();
+            if (remainingNumberOfOtpAttemptsQueryParam != null && remainingNumberOfOtpAttemptsQueryParam.isBlank()) {
+                int remainingNumberOfOtpAttempts = getRemainingNumberOfOtpAttempts(authenticatedUser, tenantDomain);
+                queryParamsBuilder.append(getRemainingNumberOfOtpAttemptsQueryParam())
+                            .append(remainingNumberOfOtpAttempts);
+            }
             queryParamsBuilder.append(RETRY_QUERY_PARAMS);
         }
         if (isOTPAsFirstFactor(context)) {
@@ -739,6 +746,42 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
             response.sendRedirect(url);
         } catch (IOException e) {
             throw handleAuthErrorScenario(ERROR_CODE_ERROR_REDIRECTING_TO_LOGIN_PAGE, e, (Object) null);
+        }
+    }
+
+    /**
+     * Get remaining number of otp attempts.
+     *
+     * @param authenticatedUser Authenticated User.
+     * @throws AuthenticationFailedException Exception on authentication failure.
+     */
+    private int getRemainingNumberOfOtpAttempts(AuthenticatedUser authenticatedUser, String tenantDomain)
+            throws AuthenticationFailedException {
+
+        try {
+            UserStoreManager userStoreManager = getUserStoreManager(authenticatedUser);
+            String failedAttemptsClaim = getOTPFailedAttemptsClaimUri();
+            if (userStoreManager == null) {
+                throw handleAuthErrorScenario(ERROR_CODE_ERROR_GETTING_USER_STORE_MANAGER);
+            }
+            String fullQualifiedUsername = authenticatedUser.toFullQualifiedUsername();
+            Map<String, String> claimValues = userStoreManager.getUserClaimValues(MultitenantUtils
+                            .getTenantAwareUsername(fullQualifiedUsername),
+                    new String[]{failedAttemptsClaim}, null);
+            String failedSmsOtpAttempts = claimValues.get(failedAttemptsClaim);
+            int maxFailedAttemptsOnAccountLock = Arrays.stream(AuthenticatorUtils
+                            .getAccountLockConnectorConfigs(tenantDomain))
+                    .filter(config -> AuthenticatorConstants.PROPERTY_ACCOUNT_LOCK_ON_FAILURE_MAX
+                            .equals(config.getName())).findFirst()
+                    .map(config -> Integer.parseInt(config.getValue()))
+                    .orElseThrow(() -> new AuthenticationFailedException("No configuration found for " +
+                            AuthenticatorConstants.PROPERTY_ACCOUNT_LOCK_ON_FAILURE_MAX));
+            return maxFailedAttemptsOnAccountLock - Integer.parseInt(failedSmsOtpAttempts);
+        } catch (UserStoreException e) {
+            LOG.error("Error while getting remaining SMS OTP attempts", e);
+            String errorMessage =
+                    String.format("Failed to get remaining attempts count for user : %s.", authenticatedUser);
+            throw new AuthenticationFailedException(errorMessage, e);
         }
     }
 
@@ -1299,4 +1342,9 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
     protected abstract String getErrorPageURL(AuthenticationContext context) throws AuthenticationFailedException;
 
     protected abstract String getOTPLoginPageURL(AuthenticationContext context) throws AuthenticationFailedException;
+
+    protected String getRemainingNumberOfOtpAttemptsQueryParam() {
+
+        return null;
+    }
 }

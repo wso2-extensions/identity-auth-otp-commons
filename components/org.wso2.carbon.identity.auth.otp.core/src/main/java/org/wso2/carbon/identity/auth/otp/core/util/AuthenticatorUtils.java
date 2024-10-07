@@ -20,6 +20,10 @@ package org.wso2.carbon.identity.auth.otp.core.util;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.owasp.encoder.Encode;
+import org.wso2.carbon.identity.application.authentication.framework.exception.AuthenticationFailedException;
+import org.wso2.carbon.identity.application.common.model.Property;
+import org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants;
+import org.wso2.carbon.identity.auth.otp.core.internal.AuthenticatorDataHolder;
 import org.wso2.carbon.identity.central.log.mgt.utils.LoggerUtils;
 
 import javax.servlet.http.HttpServletRequest;
@@ -58,5 +62,26 @@ public class AuthenticatorUtils {
     public static String maskIfRequired(String value) {
 
         return LoggerUtils.isLogMaskingEnable ? LoggerUtils.getMaskedContent(value) : value;
+    }
+
+    public static Property[] getAccountLockConnectorConfigs(String tenantDomain) throws
+            AuthenticationFailedException {
+
+        Property[] connectorConfigs;
+        try {
+            connectorConfigs = AuthenticatorDataHolder
+                    .getIdentityGovernanceService()
+                    .getConfiguration(
+                            new String[]{
+                                    AuthenticatorConstants.PROPERTY_LOGIN_FAIL_TIMEOUT_RATIO,
+                                    AuthenticatorConstants.PROPERTY_ACCOUNT_LOCK_ON_FAILURE,
+                                    AuthenticatorConstants.PROPERTY_ACCOUNT_LOCK_ON_FAILURE_MAX,
+                                    AuthenticatorConstants.PROPERTY_ACCOUNT_LOCK_TIME
+                            }, tenantDomain);
+        } catch (Exception e) {
+            throw new AuthenticationFailedException("Error occurred while retrieving account lock connector " +
+                    "configuration", e);
+        }
+        return connectorConfigs;
     }
 }
