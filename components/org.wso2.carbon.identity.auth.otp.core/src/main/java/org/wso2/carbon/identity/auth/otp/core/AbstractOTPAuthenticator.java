@@ -728,11 +728,13 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
             }
         }
         if (context.isRetrying() && !Boolean.parseBoolean(request.getParameter(RESEND))) {
-            String remainingNumberOfOtpAttemptsQueryParam = getRemainingNumberOfOtpAttemptsQueryParam();
-            if (remainingNumberOfOtpAttemptsQueryParam != null && remainingNumberOfOtpAttemptsQueryParam.isBlank()) {
-                int remainingNumberOfOtpAttempts = getRemainingNumberOfOtpAttempts(authenticatedUser, tenantDomain);
-                queryParamsBuilder.append(getRemainingNumberOfOtpAttemptsQueryParam())
+            if (isShowAuthFailureReason()) {
+                String remainingNumberOfOtpAttemptsQueryParam = getRemainingNumberOfOtpAttemptsQueryParam();
+                if (StringUtils.isNotBlank(remainingNumberOfOtpAttemptsQueryParam)) {
+                    int remainingNumberOfOtpAttempts = getRemainingNumberOfOtpAttempts(authenticatedUser, tenantDomain);
+                    queryParamsBuilder.append(getRemainingNumberOfOtpAttemptsQueryParam())
                             .append(remainingNumberOfOtpAttempts);
+                }
             }
             queryParamsBuilder.append(RETRY_QUERY_PARAMS);
         }
@@ -778,7 +780,7 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
                             AuthenticatorConstants.PROPERTY_ACCOUNT_LOCK_ON_FAILURE_MAX));
             return maxFailedAttemptsOnAccountLock - Integer.parseInt(failedSmsOtpAttempts);
         } catch (UserStoreException e) {
-            LOG.error("Error while getting remaining SMS OTP attempts", e);
+            LOG.error("Error while getting remaining OTP attempts", e);
             String errorMessage =
                     String.format("Failed to get remaining attempts count for user : %s.", authenticatedUser);
             throw new AuthenticationFailedException(errorMessage, e);
@@ -1346,5 +1348,10 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
     protected String getRemainingNumberOfOtpAttemptsQueryParam() {
 
         return null;
+    }
+
+    protected  boolean isShowAuthFailureReason() {
+
+        return false;
     }
 }
