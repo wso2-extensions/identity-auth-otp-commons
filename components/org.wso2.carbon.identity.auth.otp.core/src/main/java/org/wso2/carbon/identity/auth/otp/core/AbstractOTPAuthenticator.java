@@ -130,6 +130,7 @@ import static org.wso2.carbon.identity.event.IdentityEventConstants.EventPropert
 import static org.wso2.carbon.identity.event.IdentityEventConstants.EventProperty.OPERATION_STATUS;
 import static org.wso2.carbon.identity.event.IdentityEventConstants.EventProperty.PROPERTY_FAILED_LOGIN_ATTEMPTS_CLAIM;
 import static org.wso2.carbon.identity.event.IdentityEventConstants.EventProperty.USER_STORE_MANAGER;
+import static org.wso2.carbon.identity.handler.event.account.lock.constants.AccountConstants.FAILED_LOGIN_ATTEMPTS_PROPERTY;
 import static org.wso2.carbon.user.core.UserCoreConstants.PRIMARY_DEFAULT_DOMAIN_NAME;
 
 /**
@@ -755,6 +756,7 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
      * Get remaining number of otp attempts.
      *
      * @param authenticatedUser Authenticated User.
+     * @param tenantDomain Tenant Domain
      * @throws AuthenticationFailedException Exception on authentication failure.
      */
     private int getRemainingNumberOfOtpAttempts(AuthenticatedUser authenticatedUser, String tenantDomain)
@@ -770,17 +772,17 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
             Map<String, String> claimValues = userStoreManager.getUserClaimValues(MultitenantUtils
                             .getTenantAwareUsername(fullQualifiedUsername),
                     new String[]{failedAttemptsClaim}, null);
-            String failedSmsOtpAttempts = claimValues.get(failedAttemptsClaim);
+            String failedOtpAttempts = claimValues.get(failedAttemptsClaim);
             int maxFailedAttemptsOnAccountLock = Arrays.stream(AuthenticatorUtils
                             .getAccountLockConnectorConfigs(tenantDomain))
-                    .filter(config -> AuthenticatorConstants.PROPERTY_ACCOUNT_LOCK_ON_FAILURE_MAX
+                    .filter(config -> FAILED_LOGIN_ATTEMPTS_PROPERTY
                             .equals(config.getName())).findFirst()
                     .map(config -> Integer.parseInt(config.getValue()))
                     .orElseThrow(() -> new AuthenticationFailedException("No configuration found for " +
-                            AuthenticatorConstants.PROPERTY_ACCOUNT_LOCK_ON_FAILURE_MAX));
-            return maxFailedAttemptsOnAccountLock - Integer.parseInt(failedSmsOtpAttempts);
+                            FAILED_LOGIN_ATTEMPTS_PROPERTY));
+            int parsedFailedAttempts = (failedOtpAttempts != null) ? Integer.parseInt(failedOtpAttempts) : 0;
+            return maxFailedAttemptsOnAccountLock - parsedFailedAttempts;
         } catch (UserStoreException e) {
-            LOG.error("Error while getting remaining OTP attempts", e);
             String errorMessage =
                     String.format("Failed to get remaining attempts count for user : %s.", authenticatedUser);
             throw new AuthenticationFailedException(errorMessage, e);

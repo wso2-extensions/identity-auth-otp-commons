@@ -29,6 +29,9 @@ import org.wso2.carbon.identity.central.log.mgt.utils.LoggerUtils;
 import javax.servlet.http.HttpServletRequest;
 
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.MULTI_OPTION_URI_PARAM;
+import static org.wso2.carbon.identity.handler.event.account.lock.constants.AccountConstants.ACCOUNT_UNLOCK_TIME_PROPERTY;
+import static org.wso2.carbon.identity.handler.event.account.lock.constants.AccountConstants.FAILED_LOGIN_ATTEMPTS_PROPERTY;
+import static org.wso2.carbon.identity.handler.event.account.lock.constants.AccountConstants.LOGIN_FAIL_TIMEOUT_RATIO_PROPERTY;
 
 /**
  * Utility functions for the authenticator.
@@ -73,14 +76,14 @@ public class AuthenticatorUtils {
                     .getIdentityGovernanceService()
                     .getConfiguration(
                             new String[]{
-                                    AuthenticatorConstants.PROPERTY_LOGIN_FAIL_TIMEOUT_RATIO,
+                                    LOGIN_FAIL_TIMEOUT_RATIO_PROPERTY,
                                     AuthenticatorConstants.PROPERTY_ACCOUNT_LOCK_ON_FAILURE,
-                                    AuthenticatorConstants.PROPERTY_ACCOUNT_LOCK_ON_FAILURE_MAX,
-                                    AuthenticatorConstants.PROPERTY_ACCOUNT_LOCK_TIME
+                                    FAILED_LOGIN_ATTEMPTS_PROPERTY,
+                                    ACCOUNT_UNLOCK_TIME_PROPERTY
                             }, tenantDomain);
         } catch (Exception e) {
             throw new AuthenticationFailedException("Error occurred while retrieving account lock connector " +
-                    "configuration", e);
+                    "configuration for tenant : " +  tenantDomain, e);
         }
         return connectorConfigs;
     }
