@@ -20,11 +20,18 @@ package org.wso2.carbon.identity.auth.otp.core.util;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.owasp.encoder.Encode;
+import org.wso2.carbon.identity.application.authentication.framework.exception.AuthenticationFailedException;
+import org.wso2.carbon.identity.application.common.model.Property;
+import org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants;
+import org.wso2.carbon.identity.auth.otp.core.internal.AuthenticatorDataHolder;
 import org.wso2.carbon.identity.central.log.mgt.utils.LoggerUtils;
 
 import javax.servlet.http.HttpServletRequest;
 
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.MULTI_OPTION_URI_PARAM;
+import static org.wso2.carbon.identity.handler.event.account.lock.constants.AccountConstants.ACCOUNT_UNLOCK_TIME_PROPERTY;
+import static org.wso2.carbon.identity.handler.event.account.lock.constants.AccountConstants.FAILED_LOGIN_ATTEMPTS_PROPERTY;
+import static org.wso2.carbon.identity.handler.event.account.lock.constants.AccountConstants.LOGIN_FAIL_TIMEOUT_RATIO_PROPERTY;
 
 /**
  * Utility functions for the authenticator.
@@ -58,5 +65,26 @@ public class AuthenticatorUtils {
     public static String maskIfRequired(String value) {
 
         return LoggerUtils.isLogMaskingEnable ? LoggerUtils.getMaskedContent(value) : value;
+    }
+
+    public static Property[] getAccountLockConnectorConfigs(String tenantDomain) throws
+            AuthenticationFailedException {
+
+        Property[] connectorConfigs;
+        try {
+            connectorConfigs = AuthenticatorDataHolder
+                    .getIdentityGovernanceService()
+                    .getConfiguration(
+                            new String[]{
+                                    LOGIN_FAIL_TIMEOUT_RATIO_PROPERTY,
+                                    AuthenticatorConstants.PROPERTY_ACCOUNT_LOCK_ON_FAILURE,
+                                    FAILED_LOGIN_ATTEMPTS_PROPERTY,
+                                    ACCOUNT_UNLOCK_TIME_PROPERTY
+                            }, tenantDomain);
+        } catch (Exception e) {
+            throw new AuthenticationFailedException("Error occurred while retrieving account lock connector " +
+                    "configuration for tenant : " +  tenantDomain, e);
+        }
+        return connectorConfigs;
     }
 }

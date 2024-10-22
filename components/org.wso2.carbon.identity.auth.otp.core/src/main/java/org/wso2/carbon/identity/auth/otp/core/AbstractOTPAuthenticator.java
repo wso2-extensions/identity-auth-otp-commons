@@ -63,6 +63,7 @@ import org.wso2.carbon.utils.multitenancy.MultitenantUtils;
 
 import java.io.IOException;
 import java.security.SecureRandom;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -129,6 +130,7 @@ import static org.wso2.carbon.identity.event.IdentityEventConstants.EventPropert
 import static org.wso2.carbon.identity.event.IdentityEventConstants.EventProperty.OPERATION_STATUS;
 import static org.wso2.carbon.identity.event.IdentityEventConstants.EventProperty.PROPERTY_FAILED_LOGIN_ATTEMPTS_CLAIM;
 import static org.wso2.carbon.identity.event.IdentityEventConstants.EventProperty.USER_STORE_MANAGER;
+import static org.wso2.carbon.identity.handler.event.account.lock.constants.AccountConstants.FAILED_LOGIN_ATTEMPTS_PROPERTY;
 import static org.wso2.carbon.user.core.UserCoreConstants.PRIMARY_DEFAULT_DOMAIN_NAME;
 
 /**
@@ -727,6 +729,14 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
             }
         }
         if (context.isRetrying() && !Boolean.parseBoolean(request.getParameter(RESEND))) {
+            if (isShowAuthFailureReason()) {
+                String remainingNumberOfOtpAttemptsQueryParam = getRemainingNumberOfOtpAttemptsQueryParam();
+                if (StringUtils.isNotBlank(remainingNumberOfOtpAttemptsQueryParam)) {
+                    int remainingNumberOfOtpAttempts = getRemainingNumberOfOtpAttempts(authenticatedUser, tenantDomain);
+                    queryParamsBuilder.append(getRemainingNumberOfOtpAttemptsQueryParam())
+                            .append(remainingNumberOfOtpAttempts);
+                }
+            }
             queryParamsBuilder.append(RETRY_QUERY_PARAMS);
         }
         if (isOTPAsFirstFactor(context)) {
@@ -739,6 +749,43 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
             response.sendRedirect(url);
         } catch (IOException e) {
             throw handleAuthErrorScenario(ERROR_CODE_ERROR_REDIRECTING_TO_LOGIN_PAGE, e, (Object) null);
+        }
+    }
+
+    /**
+     * Get remaining number of otp attempts.
+     *
+     * @param authenticatedUser Authenticated User.
+     * @param tenantDomain Tenant Domain
+     * @throws AuthenticationFailedException Exception on authentication failure.
+     */
+    private int getRemainingNumberOfOtpAttempts(AuthenticatedUser authenticatedUser, String tenantDomain)
+            throws AuthenticationFailedException {
+
+        try {
+            UserStoreManager userStoreManager = getUserStoreManager(authenticatedUser);
+            String failedAttemptsClaim = getOTPFailedAttemptsClaimUri();
+            if (userStoreManager == null) {
+                throw handleAuthErrorScenario(ERROR_CODE_ERROR_GETTING_USER_STORE_MANAGER);
+            }
+            String fullQualifiedUsername = authenticatedUser.toFullQualifiedUsername();
+            Map<String, String> claimValues = userStoreManager.getUserClaimValues(MultitenantUtils
+                            .getTenantAwareUsername(fullQualifiedUsername),
+                    new String[]{failedAttemptsClaim}, null);
+            String failedOtpAttempts = claimValues.get(failedAttemptsClaim);
+            int maxFailedAttemptsOnAccountLock = Arrays.stream(AuthenticatorUtils
+                            .getAccountLockConnectorConfigs(tenantDomain))
+                    .filter(config -> FAILED_LOGIN_ATTEMPTS_PROPERTY
+                            .equals(config.getName())).findFirst()
+                    .map(config -> Integer.parseInt(config.getValue()))
+                    .orElseThrow(() -> new AuthenticationFailedException("No configuration found for " +
+                            FAILED_LOGIN_ATTEMPTS_PROPERTY));
+            int parsedFailedAttempts = (failedOtpAttempts != null) ? Integer.parseInt(failedOtpAttempts) : 0;
+            return maxFailedAttemptsOnAccountLock - parsedFailedAttempts;
+        } catch (UserStoreException e) {
+            String errorMessage =
+                    String.format("Failed to get remaining attempts count for user : %s.", authenticatedUser);
+            throw new AuthenticationFailedException(errorMessage, e);
         }
     }
 
@@ -1299,4 +1346,14 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
     protected abstract String getErrorPageURL(AuthenticationContext context) throws AuthenticationFailedException;
 
     protected abstract String getOTPLoginPageURL(AuthenticationContext context) throws AuthenticationFailedException;
+
+    protected String getRemainingNumberOfOtpAttemptsQueryParam() {
+
+        return null;
+    }
+
+    protected  boolean isShowAuthFailureReason() {
+
+        return false;
+    }
 }

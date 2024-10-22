@@ -60,6 +60,7 @@ public class AuthenticatorConstants {
     public static final String MULTI_OPTION_URI_PARAM = "&multiOptionURI=";
     public static final String RECAPTCHA_PARAM = "&reCaptcha=";
     public static final String USERNAME_PARAM = "&username=";
+    public static final String PROPERTY_ACCOUNT_LOCK_ON_FAILURE = "account.lock.handler.enable";
 
     /**
      * User claim related constants.
