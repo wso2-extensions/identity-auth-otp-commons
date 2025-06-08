@@ -28,12 +28,12 @@ import org.wso2.carbon.identity.event.IdentityEventConstants;
 import org.wso2.carbon.identity.event.IdentityEventException;
 import org.wso2.carbon.identity.event.event.Event;
 import org.wso2.carbon.identity.event.handler.notification.NotificationConstants;
-import org.wso2.carbon.identity.user.registration.engine.Constants;
-import org.wso2.carbon.identity.user.registration.engine.exception.RegistrationEngineException;
-import org.wso2.carbon.identity.user.registration.engine.exception.RegistrationEngineServerException;
-import org.wso2.carbon.identity.user.registration.engine.graph.Executor;
-import org.wso2.carbon.identity.user.registration.engine.model.ExecutorResponse;
-import org.wso2.carbon.identity.user.registration.engine.model.RegistrationContext;
+import org.wso2.carbon.identity.flow.execution.engine.Constants;
+import org.wso2.carbon.identity.flow.execution.engine.exception.FlowEngineException;
+import org.wso2.carbon.identity.flow.execution.engine.exception.FlowEngineServerException;
+import org.wso2.carbon.identity.flow.execution.engine.graph.Executor;
+import org.wso2.carbon.identity.flow.execution.engine.model.ExecutorResponse;
+import org.wso2.carbon.identity.flow.execution.engine.model.FlowExecutionContext;
 import org.wso2.carbon.utils.DiagnosticLog;
 
 import java.security.SecureRandom;
@@ -48,10 +48,10 @@ import static org.wso2.carbon.identity.auth.otp.core.constant.OTPExecutorConstan
 import static org.wso2.carbon.identity.auth.otp.core.constant.OTPExecutorConstants.OTP_RETRY_COUNT;
 import static org.wso2.carbon.identity.event.handler.notification.NotificationConstants.FLOW_TYPE;
 import static org.wso2.carbon.identity.event.handler.notification.NotificationConstants.REGISTRATION_FLOW;
-import static org.wso2.carbon.identity.user.registration.engine.Constants.ExecutorStatus.STATUS_COMPLETE;
-import static org.wso2.carbon.identity.user.registration.engine.Constants.ExecutorStatus.STATUS_RETRY;
-import static org.wso2.carbon.identity.user.registration.engine.Constants.ExecutorStatus.STATUS_USER_ERROR;
-import static org.wso2.carbon.identity.user.registration.engine.Constants.ExecutorStatus.STATUS_USER_INPUT_REQUIRED;
+import static org.wso2.carbon.identity.flow.execution.engine.Constants.ExecutorStatus.STATUS_COMPLETE;
+import static org.wso2.carbon.identity.flow.execution.engine.Constants.ExecutorStatus.STATUS_RETRY;
+import static org.wso2.carbon.identity.flow.execution.engine.Constants.ExecutorStatus.STATUS_USER_ERROR;
+import static org.wso2.carbon.identity.flow.execution.engine.Constants.ExecutorStatus.STATUS_USER_INPUT_REQUIRED;
 
 /**
  * Abstract class for OTP executors.
@@ -60,72 +60,72 @@ import static org.wso2.carbon.identity.user.registration.engine.Constants.Execut
 public abstract class AbstractOTPExecutor implements Executor {
 
     @Override
-    public ExecutorResponse execute(RegistrationContext registrationContext) throws RegistrationEngineException {
+    public ExecutorResponse execute(FlowExecutionContext flowExecutionContext) throws FlowEngineException {
 
         ExecutorResponse response = new ExecutorResponse();
         response.setContextProperty(new HashMap<>());
 
-        handleMaxRetryCount(registrationContext, response);
+        handleMaxRetryCount(flowExecutionContext, response);
         if (STATUS_USER_ERROR.equals(response.getResult())) {
             return response;
         }
 
-        if (isInitiateRequest(registrationContext)) {
-            initiateExecution(registrationContext, response);
+        if (isInitiateRequest(flowExecutionContext)) {
+            initiateExecution(flowExecutionContext, response);
         } else {
-            processResponse(registrationContext, response);
+            processResponse(flowExecutionContext, response);
         }
-        handleRetry(registrationContext, response);
+        handleRetry(flowExecutionContext, response);
         return response;
     }
 
     /**
      * This method is used to check whether the request is an initiate request or not.
      *
-     * @param registrationContext Registration context.
+     * @param flowExecutionContext Registration context.
      * @return true if it is an initiate request, false otherwise.
      */
-    protected boolean isInitiateRequest(RegistrationContext registrationContext) {
+    protected boolean isInitiateRequest(FlowExecutionContext flowExecutionContext) {
 
-        return registrationContext.getUserInputData().get(OTP) == null &&
-                registrationContext.getProperty(OTP_RETRY_COUNT) == null;
+        return flowExecutionContext.getUserInputData().get(OTP) == null &&
+                flowExecutionContext.getProperty(OTP_RETRY_COUNT) == null;
     }
 
     /**
      * This method is used to initiate the OTP execution.
      *
-     * @param registrationContext Registration context.
-     * @param response            Executor response.
-     * @throws RegistrationEngineException if an error occurs while initiating the execution.
+     * @param flowExecutionContext Registration context.
+     * @param response             Executor response.
+     * @throws FlowEngineException if an error occurs while initiating the execution.
      */
-    protected void initiateExecution(RegistrationContext registrationContext, ExecutorResponse response)
-            throws RegistrationEngineException {
+    protected void initiateExecution(FlowExecutionContext flowExecutionContext, ExecutorResponse response)
+            throws FlowEngineException {
 
         response.setResult(STATUS_USER_INPUT_REQUIRED);
         List<String> requiredData = new ArrayList<>();
         requiredData.add(OTPExecutorConstants.OTP);
         response.setRequiredData(requiredData);
-        triggerOTP(OTPExecutorConstants.OTPScenarios.INITIAL_OTP, registrationContext, response);
+        triggerOTP(OTPExecutorConstants.OTPScenarios.INITIAL_OTP, flowExecutionContext, response);
     }
 
     /**
      * This method is used to process the response of the OTP execution.
      *
-     * @param registrationContext Registration context.
-     * @param response            Executor response.
-     * @throws RegistrationEngineServerException if an error occurs while processing the response.
+     * @param flowExecutionContext Registration context.
+     * @param response             Executor response.
+     * @throws FlowEngineServerException if an error occurs while processing the response.
      */
-    protected void processResponse(RegistrationContext registrationContext, ExecutorResponse response)
-            throws RegistrationEngineServerException {
+    protected void processResponse(FlowExecutionContext flowExecutionContext, ExecutorResponse response)
+            throws FlowEngineServerException {
 
         try {
-            String inputOTP = registrationContext.getUserInputData().get(OTP);
+            String inputOTP = flowExecutionContext.getUserInputData().get(OTP);
             if (StringUtils.isBlank(inputOTP)) {
                 response.setResult(STATUS_RETRY);
                 return;
             }
 
-            OTP contextOTP = (OTP) registrationContext.getProperty(OTP);
+            OTP contextOTP = (OTP) flowExecutionContext.getProperty(OTP);
             if (contextOTP == null) {
                 response.setResult(Constants.ExecutorStatus.STATUS_ERROR);
                 response.setErrorMessage("OTP is not generated.");
@@ -135,20 +135,20 @@ public abstract class AbstractOTPExecutor implements Executor {
             if (inputOTP.equals(contextOTP.getValue())) {
                 if (contextOTP.isExpired()) {
                     response.setResult(STATUS_RETRY);
-                    publishPostOTPValidationEvent(registrationContext, false, true);
+                    publishPostOTPValidationEvent(flowExecutionContext, false, true);
                 } else {
-                    response.setResult(Constants.ExecutorStatus.STATUS_COMPLETE);
+                    response.setResult(STATUS_COMPLETE);
                     Map<String, Object> contextProps = response.getContextProperties();
                     contextProps.put(OTP, null);
-                    handleClaimUpdate(registrationContext, response);
-                    publishPostOTPValidationEvent(registrationContext, true, false);
+                    handleClaimUpdate(flowExecutionContext, response);
+                    publishPostOTPValidationEvent(flowExecutionContext, true, false);
                 }
             } else {
                 response.setResult(STATUS_RETRY);
-                publishPostOTPValidationEvent(registrationContext, false, false);
+                publishPostOTPValidationEvent(flowExecutionContext, false, false);
             }
 
-        } catch (RegistrationEngineException e) {
+        } catch (FlowEngineException e) {
             logDiagnostic("Error occurred while processing the response in " + getName(),
                     DiagnosticLog.ResultStatus.FAILED, OTPExecutorConstants.LogConstants.ActionID.PROCESS_OTP);
             throw handleAuthErrorScenario(e, "Error occurred while processing the response in " +
@@ -161,10 +161,10 @@ public abstract class AbstractOTPExecutor implements Executor {
      *
      * @param context  Registration context.
      * @param response Executor response.
-     * @throws RegistrationEngineException if an error occurs while handling the maximum retry count.
+     * @throws FlowEngineException if an error occurs while handling the maximum retry count.
      */
-    protected void handleMaxRetryCount(RegistrationContext context, ExecutorResponse response)
-            throws RegistrationEngineException {
+    protected void handleMaxRetryCount(FlowExecutionContext context, ExecutorResponse response)
+            throws FlowEngineException {
 
         if (getCurrentRetryCount(context) >= getMaxRetryCount(context)) {
             response.setResult(STATUS_USER_ERROR);
@@ -175,26 +175,26 @@ public abstract class AbstractOTPExecutor implements Executor {
     /**
      * This method is used to handle the retry count.
      *
-     * @param registrationContext Registration context.
-     * @param response            Executor response.
-     * @throws RegistrationEngineException if an error occurs while handling the retry count.
+     * @param flowExecutionContext Registration context.
+     * @param response             Executor response.
+     * @throws FlowEngineException if an error occurs while handling the retry count.
      */
-    protected void handleRetry(RegistrationContext registrationContext, ExecutorResponse response)
-            throws RegistrationEngineException {
+    protected void handleRetry(FlowExecutionContext flowExecutionContext, ExecutorResponse response)
+            throws FlowEngineException {
 
         String result = response.getResult();
         if (STATUS_RETRY.equals(result)) {
             response.setErrorMessage("Invalid or expired OTP. Please try again.");
-            OTP otp = (OTP) registrationContext.getProperty(OTP);
+            OTP otp = (OTP) flowExecutionContext.getProperty(OTP);
             if (otp != null && otp.isExpired()) {
-                triggerOTP(OTPExecutorConstants.OTPScenarios.RESEND_OTP, registrationContext, response);
+                triggerOTP(OTPExecutorConstants.OTPScenarios.RESEND_OTP, flowExecutionContext, response);
                 return;
             }
         } else if (STATUS_COMPLETE.equals(result)) {
             response.getContextProperties().remove(OTP_RETRY_COUNT);
             return;
         }
-        response.getContextProperties().put(OTP_RETRY_COUNT, getCurrentRetryCount(registrationContext) + 1);
+        response.getContextProperties().put(OTP_RETRY_COUNT, getCurrentRetryCount(flowExecutionContext) + 1);
     }
 
     /**
@@ -202,9 +202,9 @@ public abstract class AbstractOTPExecutor implements Executor {
      *
      * @param tenantDomain Tenant domain.
      * @return Generated OTP.
-     * @throws RegistrationEngineException if an error occurs while generating the OTP.
+     * @throws FlowEngineException if an error occurs while generating the OTP.
      */
-    protected OTP generateOTP(String tenantDomain) throws RegistrationEngineException {
+    protected OTP generateOTP(String tenantDomain) throws FlowEngineException {
 
         final char[] chars = getOTPCharset(tenantDomain).toCharArray();
         final int otpLength = getOTPLength(tenantDomain);
@@ -223,10 +223,10 @@ public abstract class AbstractOTPExecutor implements Executor {
      * @param scenario Scenario.
      * @param context  Registration context.
      * @param response Executor response.
-     * @throws RegistrationEngineException if an error occurs while triggering the OTP.
+     * @throws FlowEngineException if an error occurs while triggering the OTP.
      */
-    protected void triggerOTP(OTPExecutorConstants.OTPScenarios scenario, RegistrationContext context,
-                              ExecutorResponse response) throws RegistrationEngineException {
+    protected void triggerOTP(OTPExecutorConstants.OTPScenarios scenario, FlowExecutionContext context,
+                              ExecutorResponse response) throws FlowEngineException {
 
         OTP otp = generateOTP(context.getTenantDomain());
         Map<String, Object> contextProperties = response.getContextProperties();
@@ -268,12 +268,12 @@ public abstract class AbstractOTPExecutor implements Executor {
      * @return RegistrationEngineServerException.
      */
     @SuppressFBWarnings("FORMAT_STRING_MANIPULATION")
-    protected RegistrationEngineServerException handleAuthErrorScenario(Throwable throwable, Object... data) {
+    protected FlowEngineServerException handleAuthErrorScenario(Throwable throwable, Object... data) {
 
         String detailMessage = (data != null && data.length > 0 && data[0] instanceof String)
                 ? (String) data[0]
                 : "Error occurred in " + getName() + ".";
-        return new RegistrationEngineServerException(Constants.ErrorMessages.ERROR_CODE_EXECUTOR_FAILURE.getCode(),
+        return new FlowEngineServerException(Constants.ErrorMessages.ERROR_CODE_EXECUTOR_FAILURE.getCode(),
                 Constants.ErrorMessages.ERROR_CODE_EXECUTOR_FAILURE.getMessage(), detailMessage, throwable);
     }
 
@@ -282,10 +282,10 @@ public abstract class AbstractOTPExecutor implements Executor {
      *
      * @param scenario Scenario.
      * @param context  Registration context.
-     * @throws RegistrationEngineException if an error occurs while publishing the event.
+     * @throws FlowEngineException if an error occurs while publishing the event.
      */
-    protected void publishPostOTPGeneratedEvent(OTPExecutorConstants.OTPScenarios scenario, RegistrationContext context)
-            throws RegistrationEngineException {
+    protected void publishPostOTPGeneratedEvent(OTPExecutorConstants.OTPScenarios scenario, FlowExecutionContext context)
+            throws FlowEngineException {
 
         try {
             OTP otp = (OTP) context.getProperty(OTP);
@@ -315,11 +315,11 @@ public abstract class AbstractOTPExecutor implements Executor {
      * @param context                Registration context.
      * @param isAuthenticationPassed true if the authentication is passed, false otherwise.
      * @param isExpired              true if the OTP is expired, false otherwise.
-     * @throws RegistrationEngineException if an error occurs while publishing the event.
+     * @throws FlowEngineException if an error occurs while publishing the event.
      */
-    protected void publishPostOTPValidationEvent(RegistrationContext context, boolean isAuthenticationPassed,
+    protected void publishPostOTPValidationEvent(FlowExecutionContext context, boolean isAuthenticationPassed,
                                                  boolean isExpired)
-            throws RegistrationEngineException {
+            throws FlowEngineException {
 
         try {
             Map<String, Object> eventProperties = new HashMap<>();
@@ -358,29 +358,29 @@ public abstract class AbstractOTPExecutor implements Executor {
         }
     }
 
-    private int getCurrentRetryCount(RegistrationContext context) {
+    private int getCurrentRetryCount(FlowExecutionContext context) {
 
         return Optional.ofNullable((Integer) context.getProperty(OTP_RETRY_COUNT)).orElse(0);
     }
 
     abstract protected Event getSendOTPEvent(OTPExecutorConstants.OTPScenarios otpScenario, OTP otp,
-                                             RegistrationContext context) throws RegistrationEngineException;
+                                             FlowExecutionContext context) throws FlowEngineException;
 
-    abstract protected long getOTPValidityPeriod(String tenantDomain) throws RegistrationEngineException;
+    abstract protected long getOTPValidityPeriod(String tenantDomain) throws FlowEngineException;
 
-    abstract protected int getMaxResendCount(RegistrationContext registrationContext)
-            throws RegistrationEngineException;
+    abstract protected int getMaxResendCount(FlowExecutionContext flowExecutionContext)
+            throws FlowEngineException;
 
-    abstract protected int getMaxRetryCount(RegistrationContext registrationContext) throws RegistrationEngineException;
+    abstract protected int getMaxRetryCount(FlowExecutionContext flowExecutionContext) throws FlowEngineException;
 
-    abstract protected void handleClaimUpdate(RegistrationContext registrationContext,
-                                              ExecutorResponse response) throws RegistrationEngineException;
+    abstract protected void handleClaimUpdate(FlowExecutionContext flowExecutionContext,
+                                              ExecutorResponse response) throws FlowEngineException;
 
     abstract protected String getDiagnosticLogComponentId();
 
-    abstract protected int getOTPLength(String tenantDomain) throws RegistrationEngineException;
+    abstract protected int getOTPLength(String tenantDomain) throws FlowEngineException;
 
-    abstract protected String getOTPCharset(String tenantDomain) throws RegistrationEngineException;
+    abstract protected String getOTPCharset(String tenantDomain) throws FlowEngineException;
 
     abstract protected String getPostOTPGeneratedEventName();
 
