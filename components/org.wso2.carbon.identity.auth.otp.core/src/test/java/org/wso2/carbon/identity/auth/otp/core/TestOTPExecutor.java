@@ -22,9 +22,9 @@ import org.wso2.carbon.identity.auth.otp.core.constant.OTPExecutorConstants;
 import org.wso2.carbon.identity.auth.otp.core.model.OTP;
 import org.wso2.carbon.identity.event.event.Event;
 import org.wso2.carbon.identity.event.handler.notification.NotificationConstants;
-import org.wso2.carbon.identity.user.registration.engine.exception.RegistrationEngineException;
-import org.wso2.carbon.identity.user.registration.engine.model.ExecutorResponse;
-import org.wso2.carbon.identity.user.registration.engine.model.RegistrationContext;
+import org.wso2.carbon.identity.flow.execution.engine.exception.FlowEngineException;
+import org.wso2.carbon.identity.flow.execution.engine.model.ExecutorResponse;
+import org.wso2.carbon.identity.flow.execution.engine.model.FlowExecutionContext;
 
 import java.util.HashMap;
 import java.util.List;
@@ -43,14 +43,14 @@ public class TestOTPExecutor extends AbstractOTPExecutor {
     private static final int DEFAULT_MAX_RETRY = 3;
 
     @Override
-    protected Event getSendOTPEvent(OTPExecutorConstants.OTPScenarios otpScenario, OTP otp, RegistrationContext context)
-            throws RegistrationEngineException {
+    protected Event getSendOTPEvent(OTPExecutorConstants.OTPScenarios otpScenario, OTP otp, FlowExecutionContext context)
+            throws FlowEngineException {
 
         Map<String, Object> eventProperties = new HashMap<>();
         eventProperties.put(CODE, otp.getValue());
         eventProperties.put(NotificationConstants.TEMPLATE_TYPE, TestOTPExecutorConstants.TEST_TEMPLATE_TYPE);
-        String sendTo = context.getRegisteringUser() != null ?
-                (String) context.getRegisteringUser().getClaim(TestOTPExecutorConstants.TEST_CLAIM)
+        String sendTo = context.getFlowUser() != null ?
+                (String) context.getFlowUser().getClaim(TestOTPExecutorConstants.TEST_CLAIM)
                 : "default@wso2.com";
         eventProperties.put(NotificationConstants.ARBITRARY_SEND_TO, sendTo);
         eventProperties.put(NotificationConstants.TENANT_DOMAIN, context.getTenantDomain());
@@ -64,19 +64,19 @@ public class TestOTPExecutor extends AbstractOTPExecutor {
     }
 
     @Override
-    protected int getMaxResendCount(RegistrationContext registrationContext) {
+    protected int getMaxResendCount(FlowExecutionContext registrationContext) {
 
         return DEFAULT_MAX_RETRY;
     }
 
     @Override
-    protected int getMaxRetryCount(RegistrationContext registrationContext) {
+    protected int getMaxRetryCount(FlowExecutionContext registrationContext) {
 
         return DEFAULT_MAX_RETRY;
     }
 
     @Override
-    protected void handleClaimUpdate(RegistrationContext registrationContext, ExecutorResponse response) {
+    protected void handleClaimUpdate(FlowExecutionContext registrationContext, ExecutorResponse response) {
 
         Map<String, Object> claims = new HashMap<>();
         claims.put(TestOTPExecutorConstants.TEST_UPDATING_CLAIM, TestOTPExecutorConstants.TEST_UPDATING_CLAIM_VALUE);
@@ -123,6 +123,12 @@ public class TestOTPExecutor extends AbstractOTPExecutor {
     public List<String> getInitiationData() {
 
         return java.util.Collections.singletonList(TestOTPExecutorConstants.TEST_CLAIM);
+    }
+
+    @Override
+    public ExecutorResponse rollback(FlowExecutionContext flowExecutionContext) throws FlowEngineException {
+
+        return null;
     }
 
     @Override

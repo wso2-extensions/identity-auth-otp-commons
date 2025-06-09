@@ -33,9 +33,9 @@ import org.wso2.carbon.identity.central.log.mgt.utils.LoggerUtils;
 import org.wso2.carbon.identity.event.IdentityEventException;
 import org.wso2.carbon.identity.event.event.Event;
 import org.wso2.carbon.identity.event.services.IdentityEventService;
-import org.wso2.carbon.identity.user.registration.engine.exception.RegistrationEngineException;
-import org.wso2.carbon.identity.user.registration.engine.model.ExecutorResponse;
-import org.wso2.carbon.identity.user.registration.engine.model.RegistrationContext;
+import org.wso2.carbon.identity.flow.execution.engine.exception.FlowEngineException;
+import org.wso2.carbon.identity.flow.execution.engine.model.ExecutorResponse;
+import org.wso2.carbon.identity.flow.execution.engine.model.FlowExecutionContext;
 
 import java.util.HashMap;
 
@@ -51,8 +51,10 @@ import static org.wso2.carbon.identity.auth.otp.core.constant.OTPExecutorConstan
 import static org.wso2.carbon.identity.event.IdentityEventConstants.EventProperty.GENERATED_OTP;
 import static org.wso2.carbon.identity.event.IdentityEventConstants.EventProperty.OTP_STATUS;
 import static org.wso2.carbon.identity.event.IdentityEventConstants.EventProperty.OTP_USED_TIME;
-import static org.wso2.carbon.identity.user.registration.engine.Constants.ExecutorStatus.STATUS_RETRY;
-import static org.wso2.carbon.identity.user.registration.engine.Constants.ExecutorStatus.STATUS_USER_ERROR;
+import static org.wso2.carbon.identity.flow.execution.engine.Constants.ExecutorStatus.STATUS_COMPLETE;
+import static org.wso2.carbon.identity.flow.execution.engine.Constants.ExecutorStatus.STATUS_ERROR;
+import static org.wso2.carbon.identity.flow.execution.engine.Constants.ExecutorStatus.STATUS_RETRY;
+import static org.wso2.carbon.identity.flow.execution.engine.Constants.ExecutorStatus.STATUS_USER_ERROR;
 
 /**
  * Abstract OTP executor test class.
@@ -60,7 +62,7 @@ import static org.wso2.carbon.identity.user.registration.engine.Constants.Execut
 public class AbstractOTPExecutorTest {
 
     private TestOTPExecutor testOTPExecutor;
-    private RegistrationContext registrationContext;
+    private FlowExecutionContext flowExecutionContext;
     private ExecutorResponse response;
 
     @Mock
@@ -85,8 +87,8 @@ public class AbstractOTPExecutorTest {
     @BeforeMethod
     public void setUpMethod() {
 
-        registrationContext = new RegistrationContext();
-        registrationContext.setTenantDomain(CARBON_SUPER);
+        flowExecutionContext = new FlowExecutionContext();
+        flowExecutionContext.setTenantDomain(CARBON_SUPER);
         response = new ExecutorResponse();
         response.setContextProperty(new HashMap<>());
     }
@@ -110,18 +112,18 @@ public class AbstractOTPExecutorTest {
     @Test
     public void testIsInitiateRequest() {
 
-        boolean result = testOTPExecutor.isInitiateRequest(registrationContext);
+        boolean result = testOTPExecutor.isInitiateRequest(flowExecutionContext);
         Assert.assertTrue(result);
-        registrationContext.getUserInputData().put(OTPExecutorConstants.OTP, "1234");
-        result = testOTPExecutor.isInitiateRequest(registrationContext);
+        flowExecutionContext.getUserInputData().put(OTPExecutorConstants.OTP, "1234");
+        result = testOTPExecutor.isInitiateRequest(flowExecutionContext);
         Assert.assertFalse(result);
     }
 
     @Test
-    public void testInitiateExecution() throws RegistrationEngineException {
+    public void testInitiateExecution() throws FlowEngineException {
 
         response.setContextProperty(new HashMap<>());
-        testOTPExecutor.initiateExecution(registrationContext, response);
+        testOTPExecutor.initiateExecution(flowExecutionContext, response);
         Assert.assertNotNull(response.getContextProperties().get(OTPExecutorConstants.OTP));
         Assert.assertNotNull(response.getRequiredData().get(0));
         Assert.assertEquals(response.getRequiredData().get(0), OTPExecutorConstants.OTP);
@@ -133,36 +135,36 @@ public class AbstractOTPExecutorTest {
     }
 
     @Test
-    public void testHandleMaxRetryCount() throws RegistrationEngineException {
+    public void testHandleMaxRetryCount() throws FlowEngineException {
 
-        testOTPExecutor.handleMaxRetryCount(registrationContext, response);
+        testOTPExecutor.handleMaxRetryCount(flowExecutionContext, response);
         Assert.assertNotEquals(response.getResult(), STATUS_USER_ERROR);
-        registrationContext.setProperty(OTP_RETRY_COUNT, 3);
-        testOTPExecutor.handleMaxRetryCount(registrationContext, response);
+        flowExecutionContext.setProperty(OTP_RETRY_COUNT, 3);
+        testOTPExecutor.handleMaxRetryCount(flowExecutionContext, response);
         Assert.assertEquals(response.getResult(), STATUS_USER_ERROR);
     }
 
     @Test
-    public void testHandleRetry() throws RegistrationEngineException {
+    public void testHandleRetry() throws FlowEngineException {
 
-        testOTPExecutor.handleRetry(registrationContext, response);
+        testOTPExecutor.handleRetry(flowExecutionContext, response);
         Assert.assertEquals(response.getContextProperties().get(OTP_RETRY_COUNT), 1);
         response.setResult(STATUS_RETRY);
-        testOTPExecutor.handleRetry(registrationContext, response);
+        testOTPExecutor.handleRetry(flowExecutionContext, response);
         Assert.assertEquals(response.getContextProperties().get(OTP_RETRY_COUNT), 1);
     }
 
     @Test
-    public void testHandleRetryExpiredOTP() throws RegistrationEngineException {
+    public void testHandleRetryExpiredOTP() throws FlowEngineException {
 
         response.setResult(STATUS_RETRY);
-        registrationContext.setProperty(OTPExecutorConstants.OTP, new OTP("123456", 0, 0));
-        testOTPExecutor.handleRetry(registrationContext, response);
+        flowExecutionContext.setProperty(OTPExecutorConstants.OTP, new OTP("123456", 0, 0));
+        testOTPExecutor.handleRetry(flowExecutionContext, response);
         Assert.assertNull(response.getContextProperties().get(OTP_RETRY_COUNT));
     }
 
     @Test
-    public void testGenerateOTP() throws RegistrationEngineException {
+    public void testGenerateOTP() throws FlowEngineException {
 
         OTP otp = testOTPExecutor.generateOTP(CARBON_SUPER);
         Assert.assertNotNull(otp);
@@ -170,24 +172,24 @@ public class AbstractOTPExecutorTest {
     }
 
     @Test
-    public void testTriggerOTP() throws RegistrationEngineException {
+    public void testTriggerOTP() throws FlowEngineException {
 
         testOTPExecutor.triggerOTP(OTPExecutorConstants.OTPScenarios.INITIAL_OTP,
-                registrationContext, response);
+                flowExecutionContext, response);
         Assert.assertNotNull(response.getContextProperties().get(OTPExecutorConstants.OTP));
         Assert.assertNotNull(response.getAdditionalInfo().get(OTP_LENGTH));
         Assert.assertEquals(response.getAdditionalInfo().get(OTP_LENGTH), "6");
     }
 
     @Test
-    public void testPublishPostOTPGeneratedEvent() throws IdentityEventException, RegistrationEngineException {
+    public void testPublishPostOTPGeneratedEvent() throws IdentityEventException, FlowEngineException {
 
         ArgumentCaptor<Event> captor = ArgumentCaptor.forClass(Event.class);
 
         OTP otp = testOTPExecutor.generateOTP(CARBON_SUPER);
-        registrationContext.setProperty(OTPExecutorConstants.OTP, otp);
+        flowExecutionContext.setProperty(OTPExecutorConstants.OTP, otp);
         testOTPExecutor.publishPostOTPGeneratedEvent(OTPExecutorConstants.OTPScenarios.INITIAL_OTP,
-                registrationContext);
+                flowExecutionContext);
         verify(identityEventService, atLeastOnce()).handleEvent(captor.capture());
         Assert.assertNotNull(captor.getValue());
         Assert.assertNotNull(captor.getValue().getEventProperties());
@@ -195,12 +197,12 @@ public class AbstractOTPExecutorTest {
     }
 
     @Test
-    public void testPublishPostOTPValidationEventSuccess() throws RegistrationEngineException, IdentityEventException {
+    public void testPublishPostOTPValidationEventSuccess() throws FlowEngineException, IdentityEventException {
 
         ArgumentCaptor<Event> captor = ArgumentCaptor.forClass(Event.class);
         OTP otp = testOTPExecutor.generateOTP(CARBON_SUPER);
-        registrationContext.setProperty(OTPExecutorConstants.OTP, otp);
-        testOTPExecutor.publishPostOTPValidationEvent(registrationContext, true, false);
+        flowExecutionContext.setProperty(OTPExecutorConstants.OTP, otp);
+        testOTPExecutor.publishPostOTPValidationEvent(flowExecutionContext, true, false);
         verify(identityEventService, atLeastOnce()).handleEvent(captor.capture());
         Assert.assertNotNull(captor.getValue());
         Assert.assertNotNull(captor.getValue().getEventProperties());
@@ -210,12 +212,12 @@ public class AbstractOTPExecutorTest {
     }
 
     @Test
-    public void testPublishPostOTPValidationEventAuthFailed() throws RegistrationEngineException, IdentityEventException {
+    public void testPublishPostOTPValidationEventAuthFailed() throws FlowEngineException, IdentityEventException {
 
         ArgumentCaptor<Event> captor = ArgumentCaptor.forClass(Event.class);
         OTP otp = testOTPExecutor.generateOTP(CARBON_SUPER);
-        registrationContext.setProperty(OTPExecutorConstants.OTP, otp);
-        testOTPExecutor.publishPostOTPValidationEvent(registrationContext, false, false);
+        flowExecutionContext.setProperty(OTPExecutorConstants.OTP, otp);
+        testOTPExecutor.publishPostOTPValidationEvent(flowExecutionContext, false, false);
         verify(identityEventService, atLeastOnce()).handleEvent(captor.capture());
         Assert.assertNotNull(captor.getValue());
         Assert.assertNotNull(captor.getValue().getEventProperties());
@@ -225,12 +227,12 @@ public class AbstractOTPExecutorTest {
     }
 
     @Test
-    public void testPublishPostOTPValidationEventExpired() throws RegistrationEngineException, IdentityEventException {
+    public void testPublishPostOTPValidationEventExpired() throws FlowEngineException, IdentityEventException {
 
         ArgumentCaptor<Event> captor = ArgumentCaptor.forClass(Event.class);
         OTP otp = testOTPExecutor.generateOTP(CARBON_SUPER);
-        registrationContext.setProperty(OTPExecutorConstants.OTP, otp);
-        testOTPExecutor.publishPostOTPValidationEvent(registrationContext, false, true);
+        flowExecutionContext.setProperty(OTPExecutorConstants.OTP, otp);
+        testOTPExecutor.publishPostOTPValidationEvent(flowExecutionContext, false, true);
         verify(identityEventService, atLeastOnce()).handleEvent(captor.capture());
         Assert.assertNotNull(captor.getValue());
         Assert.assertNotNull(captor.getValue().getEventProperties());
@@ -240,64 +242,62 @@ public class AbstractOTPExecutorTest {
     }
 
     @Test
-    public void testProcessResponseValidOTP() throws RegistrationEngineException {
+    public void testProcessResponseValidOTP() throws FlowEngineException {
 
         OTP otp = new OTP("123456", System.currentTimeMillis(), 60000);
-        registrationContext.setProperty(OTPExecutorConstants.OTP, otp);
-        registrationContext.getUserInputData().put(OTPExecutorConstants.OTP, "123456");
-        testOTPExecutor.processResponse(registrationContext, response);
-        Assert.assertEquals(response.getResult(),
-                org.wso2.carbon.identity.user.registration.engine.Constants.ExecutorStatus.STATUS_COMPLETE);
+        flowExecutionContext.setProperty(OTPExecutorConstants.OTP, otp);
+        flowExecutionContext.getUserInputData().put(OTPExecutorConstants.OTP, "123456");
+        testOTPExecutor.processResponse(flowExecutionContext, response);
+        Assert.assertEquals(response.getResult(), STATUS_COMPLETE);
         Assert.assertNull(response.getContextProperties().get(OTPExecutorConstants.OTP));
     }
 
     @Test
-    public void testProcessResponseBlankOTP() throws RegistrationEngineException {
+    public void testProcessResponseBlankOTP() throws FlowEngineException {
 
-        registrationContext.getUserInputData().put(OTPExecutorConstants.OTP, "");
-        testOTPExecutor.processResponse(registrationContext, response);
+        flowExecutionContext.getUserInputData().put(OTPExecutorConstants.OTP, "");
+        testOTPExecutor.processResponse(flowExecutionContext, response);
         Assert.assertEquals(response.getResult(), STATUS_RETRY);
     }
 
     @Test
-    public void testProcessResponseOTPMissingInContext() throws RegistrationEngineException {
+    public void testProcessResponseOTPMissingInContext() throws FlowEngineException {
 
-        registrationContext.getUserInputData().put(OTPExecutorConstants.OTP, "123456");
-        testOTPExecutor.processResponse(registrationContext, response);
-        Assert.assertEquals(response.getResult(),
-                org.wso2.carbon.identity.user.registration.engine.Constants.ExecutorStatus.STATUS_ERROR);
+        flowExecutionContext.getUserInputData().put(OTPExecutorConstants.OTP, "123456");
+        testOTPExecutor.processResponse(flowExecutionContext, response);
+        Assert.assertEquals(response.getResult(), STATUS_ERROR);
         Assert.assertEquals(response.getErrorMessage(), "OTP is not generated.");
     }
 
     @Test
-    public void testProcessResponseWithExpiredOTP() throws RegistrationEngineException {
+    public void testProcessResponseWithExpiredOTP() throws FlowEngineException {
 
         OTP otp = new OTP("123456", 0, 1);
-        registrationContext.setProperty(OTPExecutorConstants.OTP, otp);
-        registrationContext.getUserInputData().put(OTPExecutorConstants.OTP, "123456");
-        testOTPExecutor.processResponse(registrationContext, response);
+        flowExecutionContext.setProperty(OTPExecutorConstants.OTP, otp);
+        flowExecutionContext.getUserInputData().put(OTPExecutorConstants.OTP, "123456");
+        testOTPExecutor.processResponse(flowExecutionContext, response);
         Assert.assertEquals(response.getResult(), STATUS_RETRY);
     }
 
     @Test
-    public void testProcessResponseWithIncorrectOTP() throws RegistrationEngineException {
+    public void testProcessResponseWithIncorrectOTP() throws FlowEngineException {
 
         OTP otp = new OTP("123456", System.currentTimeMillis(), 60000);
-        registrationContext.setProperty(OTPExecutorConstants.OTP, otp);
-        registrationContext.getUserInputData().put(OTPExecutorConstants.OTP, "654321");
-        testOTPExecutor.processResponse(registrationContext, response);
+        flowExecutionContext.setProperty(OTPExecutorConstants.OTP, otp);
+        flowExecutionContext.getUserInputData().put(OTPExecutorConstants.OTP, "654321");
+        testOTPExecutor.processResponse(flowExecutionContext, response);
         Assert.assertEquals(response.getResult(), STATUS_RETRY);
     }
 
     @Test
-    public void testPublishPostOTPGeneratedEventNoOTP() throws RegistrationEngineException, IdentityEventException {
+    public void testPublishPostOTPGeneratedEventNoOTP() throws FlowEngineException, IdentityEventException {
 
         testOTPExecutor.publishPostOTPGeneratedEvent(OTPExecutorConstants.OTPScenarios.INITIAL_OTP,
-                registrationContext);
+                flowExecutionContext);
         verify(identityEventService, atLeast(0)).handleEvent(any());
     }
 
-    @Test(expectedExceptions = RegistrationEngineException.class)
+    @Test(expectedExceptions = FlowEngineException.class)
     public void testTriggerOTPEventFailureHandling() throws Exception {
 
         IdentityEventService faultyService = mock(IdentityEventService.class);
@@ -307,28 +307,28 @@ public class AbstractOTPExecutorTest {
         TestOTPExecutor failingExecutor = new TestOTPExecutor() {
             @Override
             protected Event getSendOTPEvent(OTPExecutorConstants.OTPScenarios otpScenario, OTP otp,
-                                            RegistrationContext context) throws RegistrationEngineException {
+                                            FlowExecutionContext context) throws FlowEngineException {
 
-                throw new RegistrationEngineException("Simulated failure");
+                throw new FlowEngineException("Simulated failure");
             }
         };
-        failingExecutor.triggerOTP(OTPExecutorConstants.OTPScenarios.INITIAL_OTP, registrationContext, response);
+        failingExecutor.triggerOTP(OTPExecutorConstants.OTPScenarios.INITIAL_OTP, flowExecutionContext, response);
     }
 
     @Test
-    public void testHandleRetryClearsRetryCountOnSuccess() throws RegistrationEngineException {
+    public void testHandleRetryClearsRetryCountOnSuccess() throws FlowEngineException {
 
-        response.setResult(org.wso2.carbon.identity.user.registration.engine.Constants.ExecutorStatus.STATUS_COMPLETE);
+        response.setResult(STATUS_COMPLETE);
         response.getContextProperties().put(OTP_RETRY_COUNT, 2);
-        testOTPExecutor.handleRetry(registrationContext, response);
+        testOTPExecutor.handleRetry(flowExecutionContext, response);
         Assert.assertNull(response.getContextProperties().get(OTP_RETRY_COUNT));
     }
 
     @Test
-    public void testHandleMaxRetryCountExceeded() throws RegistrationEngineException {
+    public void testHandleMaxRetryCountExceeded() throws FlowEngineException {
 
-        registrationContext.setProperty(OTP_RETRY_COUNT, 5);
-        testOTPExecutor.handleMaxRetryCount(registrationContext, response);
+        flowExecutionContext.setProperty(OTP_RETRY_COUNT, 5);
+        testOTPExecutor.handleMaxRetryCount(flowExecutionContext, response);
         Assert.assertEquals(response.getResult(), STATUS_USER_ERROR);
         Assert.assertEquals(response.getErrorMessage(), "Maximum retry count exceeded.");
     }
@@ -337,7 +337,7 @@ public class AbstractOTPExecutorTest {
     public void testHandleAuthErrorScenarioFallbackMessage() {
 
         Exception e = new Exception("Test Exception");
-        RegistrationEngineException ex = testOTPExecutor.handleAuthErrorScenario(e);
+        FlowEngineException ex = testOTPExecutor.handleAuthErrorScenario(e);
         Assert.assertTrue(ex.getDescription().contains("Error occurred in TestExecutor"));
     }
 }
