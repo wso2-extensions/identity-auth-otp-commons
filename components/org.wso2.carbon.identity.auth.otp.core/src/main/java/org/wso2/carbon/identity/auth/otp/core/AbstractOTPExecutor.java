@@ -239,7 +239,8 @@ public abstract class AbstractOTPExecutor implements Executor {
 
         try {
             Event otpEvent = getSendOTPEvent(scenario, otp, context);
-            otpEvent.addEventProperty(FLOW_TYPE, REGISTRATION_FLOW);
+            String flowType = context.getFlowType();
+            otpEvent.addEventProperty(FLOW_TYPE, flowType);
             AuthenticatorDataHolder.getIdentityEventService().handleEvent(otpEvent);
         } catch (IdentityEventException e) {
             logDiagnostic("Error occurred while sending the OTP in " + getName(),
