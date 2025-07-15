@@ -140,6 +140,7 @@ public abstract class AbstractOTPExecutor implements Executor {
                     response.setResult(STATUS_COMPLETE);
                     Map<String, Object> contextProps = response.getContextProperties();
                     contextProps.put(OTP, null);
+                    flowExecutionContext.getUserInputData().remove(OTP);
                     handleClaimUpdate(flowExecutionContext, response);
                     publishPostOTPValidationEvent(flowExecutionContext, true, false);
                 }
@@ -191,6 +192,7 @@ public abstract class AbstractOTPExecutor implements Executor {
                 return;
             }
         } else if (STATUS_COMPLETE.equals(result)) {
+            flowExecutionContext.setProperty(OTP_RETRY_COUNT, null);
             response.getContextProperties().remove(OTP_RETRY_COUNT);
             return;
         }
