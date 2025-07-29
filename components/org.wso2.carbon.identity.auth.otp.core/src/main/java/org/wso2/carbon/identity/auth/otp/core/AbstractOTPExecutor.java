@@ -18,6 +18,8 @@
 
 package org.wso2.carbon.identity.auth.otp.core;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.commons.lang.StringUtils;
 import org.wso2.carbon.identity.auth.otp.core.constant.OTPExecutorConstants;
@@ -125,15 +127,11 @@ public abstract class AbstractOTPExecutor implements Executor {
                 return;
             }
 
-            OTP contextOTP = (OTP) flowExecutionContext.getProperty(OTP);
-            if (contextOTP == null) {
-                response.setResult(Constants.ExecutorStatus.STATUS_ERROR);
-                response.setErrorMessage("OTP is not generated.");
-                return;
-            }
+            OTP otp = getOTPFromContext(flowExecutionContext, response);
+            if (otp == null) return;
 
-            if (inputOTP.equals(contextOTP.getValue())) {
-                if (contextOTP.isExpired()) {
+            if (inputOTP.equals(otp.getValue())) {
+                if (otp.isExpired()) {
                     response.setResult(STATUS_RETRY);
                     publishPostOTPValidationEvent(flowExecutionContext, false, true);
                 } else {
@@ -148,13 +146,44 @@ public abstract class AbstractOTPExecutor implements Executor {
                 response.setResult(STATUS_RETRY);
                 publishPostOTPValidationEvent(flowExecutionContext, false, false);
             }
-
         } catch (FlowEngineException e) {
             logDiagnostic("Error occurred while processing the response in " + getName(),
                     DiagnosticLog.ResultStatus.FAILED, OTPExecutorConstants.LogConstants.ActionID.PROCESS_OTP);
             throw handleAuthErrorScenario(e, "Error occurred while processing the response in " +
                     getName() + ".");
         }
+    }
+
+    private static OTP getOTPFromContext(FlowExecutionContext flowExecutionContext, ExecutorResponse response) {
+
+        Object value = flowExecutionContext.getProperty(OTP);
+        ObjectMapper objectMapper = new ObjectMapper();
+        HashMap<String, Object> contextOTP = objectMapper.convertValue(value,
+                new TypeReference<HashMap<String, Object>>() {
+                });
+        if (contextOTP == null) {
+            response.setResult(Constants.ExecutorStatus.STATUS_ERROR);
+            response.setErrorMessage("OTP is not generated.");
+            return null;
+        }
+
+        Long validityPeriodInMillis;
+        if (contextOTP.get(OTPExecutorConstants.OTPData.VALIDITY_PERIOD_IN_MILLIS) instanceof Integer){
+            validityPeriodInMillis =
+                    ((Integer) contextOTP.get(OTPExecutorConstants.OTPData.VALIDITY_PERIOD_IN_MILLIS)).longValue();
+        } else if (contextOTP.get(OTPExecutorConstants.OTPData.VALIDITY_PERIOD_IN_MILLIS) instanceof Long) {
+            validityPeriodInMillis = (Long) contextOTP.get(OTPExecutorConstants.OTPData.VALIDITY_PERIOD_IN_MILLIS);
+        } else {
+            response.setResult(Constants.ExecutorStatus.STATUS_ERROR);
+            response.setErrorMessage("Invalid OTP data.");
+            return null;
+        }
+
+        return new OTP(
+                (String) contextOTP.get(OTPExecutorConstants.OTPData.VALUE),
+                (Long) contextOTP.get(OTPExecutorConstants.OTPData.GENERATED_TIME_IN_MILLIS),
+                validityPeriodInMillis
+        );
     }
 
     /**
@@ -232,7 +261,14 @@ public abstract class AbstractOTPExecutor implements Executor {
 
         OTP otp = generateOTP(context.getTenantDomain());
         Map<String, Object> contextProperties = response.getContextProperties();
-        contextProperties.put(OTP, otp);
+
+        HashMap<String, Object> otpData = new HashMap<>();
+        otpData.put(OTPExecutorConstants.OTPData.VALUE, otp.getValue());
+        otpData.put(OTPExecutorConstants.OTPData.GENERATED_TIME_IN_MILLIS, otp.getGeneratedTimeInMillis());
+        otpData.put(OTPExecutorConstants.OTPData.VALIDITY_PERIOD_IN_MILLIS, otp.getValidityPeriodInMillis());
+        otpData.put(OTPExecutorConstants.OTPData.EXPIRY_TIME_IN_MILLIS, otp.getExpiryTimeInMillis());
+
+        contextProperties.put(OTP, otpData);
         publishPostOTPGeneratedEvent(scenario, context);
 
         Map<String, String> info = new HashMap<>();

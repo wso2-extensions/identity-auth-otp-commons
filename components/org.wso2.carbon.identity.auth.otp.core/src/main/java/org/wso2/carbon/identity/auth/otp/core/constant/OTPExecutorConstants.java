@@ -61,4 +61,12 @@ public class OTPExecutorConstants {
 
         }
     }
+
+    public static class OTPData {
+
+        public static final String VALUE = "value";
+        public static final String GENERATED_TIME_IN_MILLIS = "generatedTimeInMillis";
+        public static final String VALIDITY_PERIOD_IN_MILLIS = "validityPeriodInMillis";
+        public static final String EXPIRY_TIME_IN_MILLIS = "expiryTimeInMillis";
+    }
 }
