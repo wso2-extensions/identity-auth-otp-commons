@@ -26,7 +26,7 @@
 
     <groupId>org.wso2.carbon.identity.auth.otp.commons</groupId>
     <modelVersion>4.0.0</modelVersion>
-    <version>1.0.15</version>
+    <version>1.0.16-SNAPSHOT</version>
     <artifactId>identity-auth-otp-commons</artifactId>
     <packaging>pom</packaging>
     <name>WSO2 Carbon - Abstract OTP Authenticator</name>
@@ -36,7 +36,7 @@
         <developerConnection>scm:git:https://github.com/wso2-extensions/identity-auth-otp-commons.git
         </developerConnection>
         <connection>scm:git:https://github.com/wso2-extensions/identity-auth-otp-commons.git</connection>
-        <tag>v1.0.15</tag>
+        <tag>HEAD</tag>
     </scm>
 
     <modules>
