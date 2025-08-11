@@ -42,6 +42,13 @@ public class TestOTPExecutor extends AbstractOTPExecutor {
     private static final long DEFAULT_OTP_VALIDITY = 60000L;
     private static final int DEFAULT_MAX_RETRY = 3;
 
+
+    @Override
+    public String getAMRValue() {
+
+        return TestOTPExecutorConstants.TEST_AMR_VALUE;
+    }
+
     @Override
     protected Event getSendOTPEvent(OTPExecutorConstants.OTPScenarios otpScenario, OTP otp, FlowExecutionContext context)
             throws FlowEngineException {

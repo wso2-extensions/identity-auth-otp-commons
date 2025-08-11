@@ -28,6 +28,7 @@ public class TestOTPExecutorConstants {
     }
 
     public static final String TEST_EXECUTOR_NAME = "TestExecutor";
+    public static final String TEST_AMR_VALUE = "TEST_AMR_VALUE";
     public static final String TEST_TEMPLATE_TYPE = "TEST_TEMPLATE_TYPE";
     public static final String TEST_CLAIM = "TEST_CLAIM";
     public static final String TEST_UPDATING_CLAIM = "TEST_UPDATING_CLAIM";

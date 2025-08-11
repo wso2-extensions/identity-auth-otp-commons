@@ -33,7 +33,7 @@ import org.wso2.carbon.identity.event.handler.notification.NotificationConstants
 import org.wso2.carbon.identity.flow.execution.engine.Constants;
 import org.wso2.carbon.identity.flow.execution.engine.exception.FlowEngineException;
 import org.wso2.carbon.identity.flow.execution.engine.exception.FlowEngineServerException;
-import org.wso2.carbon.identity.flow.execution.engine.graph.Executor;
+import org.wso2.carbon.identity.flow.execution.engine.graph.AuthenticationExecutor;
 import org.wso2.carbon.identity.flow.execution.engine.model.ExecutorResponse;
 import org.wso2.carbon.identity.flow.execution.engine.model.FlowExecutionContext;
 import org.wso2.carbon.utils.DiagnosticLog;
@@ -59,7 +59,7 @@ import static org.wso2.carbon.identity.flow.execution.engine.Constants.ExecutorS
  * Abstract class for OTP executors.
  * This class provides the common functionality for OTP executors.
  */
-public abstract class AbstractOTPExecutor implements Executor {
+public abstract class AbstractOTPExecutor extends AuthenticationExecutor {
 
     @Override
     public ExecutorResponse execute(FlowExecutionContext flowExecutionContext) throws FlowEngineException {
