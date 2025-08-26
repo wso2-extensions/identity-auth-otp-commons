@@ -740,7 +740,7 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
             queryParamsBuilder.append(RETRY_QUERY_PARAMS);
         }
         if (isOTPAsFirstFactor(context)) {
-            String captchaParams = getCaptchaParams(context, tenantDomain, authenticatedUser);
+            String captchaParams = getCaptchaParams(request, context, tenantDomain, authenticatedUser);
             queryParamsBuilder.append(captchaParams);
         }
         try {
@@ -1177,8 +1177,8 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
      * @param authenticatedUser Authenticated User.
      * @return String with the appended recaptcha params.
      */
-    private String getCaptchaParams(AuthenticationContext context, String tenantDomain,
-                                    AuthenticatedUser authenticatedUser) {
+    protected String getCaptchaParams(HttpServletRequest request, AuthenticationContext context, String tenantDomain,
+                                      AuthenticatedUser authenticatedUser) {
 
         if (!isOTPAsFirstFactor(context)) {
             return StringUtils.EMPTY;
