@@ -62,23 +62,30 @@ import static org.wso2.carbon.identity.flow.execution.engine.Constants.ExecutorS
 public abstract class AbstractOTPExecutor extends AuthenticationExecutor {
 
     @Override
-    public ExecutorResponse execute(FlowExecutionContext flowExecutionContext) throws FlowEngineException {
+    public ExecutorResponse execute(FlowExecutionContext flowExecutionContext) {
 
         ExecutorResponse response = new ExecutorResponse();
         response.setContextProperty(new HashMap<>());
+        try {
+            handleMaxRetryCount(flowExecutionContext, response);
+            if (STATUS_USER_ERROR.equals(response.getResult())) {
+                return response;
+            }
 
-        handleMaxRetryCount(flowExecutionContext, response);
-        if (STATUS_USER_ERROR.equals(response.getResult())) {
+            if (isInitiateRequest(flowExecutionContext)) {
+                initiateExecution(flowExecutionContext, response);
+            } else {
+                processResponse(flowExecutionContext, response);
+            }
+            handleRetry(flowExecutionContext, response);
+            return response;
+        } catch (FlowEngineException e) {
+            logDiagnostic("Error occurred while executing the flow in " + getName(),
+                    DiagnosticLog.ResultStatus.FAILED, OTPExecutorConstants.LogConstants.ActionID.PROCESS_OTP);
+            response.setResult(Constants.ExecutorStatus.STATUS_ERROR);
+            response.setErrorMessage(e.getMessage());
             return response;
         }
-
-        if (isInitiateRequest(flowExecutionContext)) {
-            initiateExecution(flowExecutionContext, response);
-        } else {
-            processResponse(flowExecutionContext, response);
-        }
-        handleRetry(flowExecutionContext, response);
-        return response;
     }
 
     /**
@@ -115,13 +122,12 @@ public abstract class AbstractOTPExecutor extends AuthenticationExecutor {
      *
      * @param flowExecutionContext Registration context.
      * @param response             Executor response.
-     * @throws FlowEngineServerException if an error occurs while processing the response.
+     * @throws FlowEngineException if an error occurs while processing the response.
      */
     protected void processResponse(FlowExecutionContext flowExecutionContext, ExecutorResponse response)
-            throws FlowEngineServerException {
+            throws FlowEngineException {
 
-        try {
-            String inputOTP = flowExecutionContext.getUserInputData().get(OTP);
+        String inputOTP = flowExecutionContext.getUserInputData().get(OTP);
             if (StringUtils.isBlank(inputOTP)) {
                 response.setResult(STATUS_RETRY);
                 return;
@@ -146,12 +152,6 @@ public abstract class AbstractOTPExecutor extends AuthenticationExecutor {
                 response.setResult(STATUS_RETRY);
                 publishPostOTPValidationEvent(flowExecutionContext, false, false);
             }
-        } catch (FlowEngineException e) {
-            logDiagnostic("Error occurred while processing the response in " + getName(),
-                    DiagnosticLog.ResultStatus.FAILED, OTPExecutorConstants.LogConstants.ActionID.PROCESS_OTP);
-            throw handleAuthErrorScenario(e, "Error occurred while processing the response in " +
-                    getName() + ".");
-        }
     }
 
     private static OTP getOTPFromContext(FlowExecutionContext flowExecutionContext, ExecutorResponse response) {
@@ -344,6 +344,8 @@ public abstract class AbstractOTPExecutor extends AuthenticationExecutor {
                         eventProperties));
             }
         } catch (IdentityEventException e) {
+            logDiagnostic("Error occurred while publishing post OTP generated event.",
+                    DiagnosticLog.ResultStatus.FAILED, SEND_OTP);
             throw handleAuthErrorScenario(e, "Error occurred while publishing post OTP generated event.");
         }
     }
