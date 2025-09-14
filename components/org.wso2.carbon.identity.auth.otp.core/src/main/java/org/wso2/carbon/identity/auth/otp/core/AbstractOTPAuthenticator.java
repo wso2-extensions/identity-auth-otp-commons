@@ -46,6 +46,7 @@ import org.wso2.carbon.identity.auth.otp.core.util.AuthenticatorUtils;
 import org.wso2.carbon.identity.captcha.connector.recaptcha.SSOLoginReCaptchaConfig;
 import org.wso2.carbon.identity.captcha.util.CaptchaConstants;
 import org.wso2.carbon.identity.captcha.util.CaptchaUtil;
+import org.wso2.carbon.identity.core.util.IdentityConfigParser;
 import org.wso2.carbon.identity.core.util.IdentityTenantUtil;
 import org.wso2.carbon.identity.event.IdentityEventConstants;
 import org.wso2.carbon.identity.event.IdentityEventException;
@@ -110,6 +111,7 @@ import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConst
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.ErrorMessages.ERROR_CODE_RETRYING_OTP_RESEND;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.ErrorMessages.ERROR_CODE_USER_ACCOUNT_LOCKED;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.FAILED_LOGIN_ATTEMPTS_CLAIM_URI;
+import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.HIDE_USER_EXISTENCE_CONFIG;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.IDF_HANDLER_NAME;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.INVALID_USERNAME;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.IS_LOGIN_ATTEMPT_BY_INVALID_USER;
@@ -289,11 +291,15 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
                     }
                     return;
                 } else if (errorUserMobileNumberMissing.equals(exception.getErrorCode())) {
-                    String queryParams = FrameworkUtils.getQueryStringWithFrameworkContextId(
-                            context.getQueryParams(), context.getCallerSessionKey(),
-                            context.getContextIdentifier());
-                    redirectToErrorPage(request, response, context, queryParams, ERROR_USER_MOBILE_NUMBER_MISSING);
-                    return;
+                    boolean hideUserExistence = Boolean.parseBoolean((String) IdentityConfigParser.getInstance()
+                            .getConfiguration().get(HIDE_USER_EXISTENCE_CONFIG));
+                    if (!isOTPAsFirstFactor(context) || !hideUserExistence) {
+                        String queryParams = FrameworkUtils.getQueryStringWithFrameworkContextId(
+                                context.getQueryParams(), context.getCallerSessionKey(),
+                                context.getContextIdentifier());
+                        redirectToErrorPage(request, response, context, queryParams, ERROR_USER_MOBILE_NUMBER_MISSING);
+                        return;
+                    }
                 } else {
                     throw exception;
                 }
