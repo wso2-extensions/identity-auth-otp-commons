@@ -189,7 +189,7 @@ public class AbstractOTPExecutorTest {
         OTP otp = testOTPExecutor.generateOTP(CARBON_SUPER);
         flowExecutionContext.setProperty(OTPExecutorConstants.OTP, otp);
         testOTPExecutor.publishPostOTPGeneratedEvent(OTPExecutorConstants.OTPScenarios.INITIAL_OTP,
-                flowExecutionContext);
+                flowExecutionContext, response);
         verify(identityEventService, atLeastOnce()).handleEvent(captor.capture());
         Assert.assertNotNull(captor.getValue());
         Assert.assertNotNull(captor.getValue().getEventProperties());
@@ -202,7 +202,7 @@ public class AbstractOTPExecutorTest {
         ArgumentCaptor<Event> captor = ArgumentCaptor.forClass(Event.class);
         OTP otp = testOTPExecutor.generateOTP(CARBON_SUPER);
         flowExecutionContext.setProperty(OTPExecutorConstants.OTP, otp);
-        testOTPExecutor.publishPostOTPValidationEvent(flowExecutionContext, true, false);
+        testOTPExecutor.publishPostOTPValidationEvent(flowExecutionContext, true, false, response);
         verify(identityEventService, atLeastOnce()).handleEvent(captor.capture());
         Assert.assertNotNull(captor.getValue());
         Assert.assertNotNull(captor.getValue().getEventProperties());
@@ -217,7 +217,7 @@ public class AbstractOTPExecutorTest {
         ArgumentCaptor<Event> captor = ArgumentCaptor.forClass(Event.class);
         OTP otp = testOTPExecutor.generateOTP(CARBON_SUPER);
         flowExecutionContext.setProperty(OTPExecutorConstants.OTP, otp);
-        testOTPExecutor.publishPostOTPValidationEvent(flowExecutionContext, false, false);
+        testOTPExecutor.publishPostOTPValidationEvent(flowExecutionContext, false, false, response);
         verify(identityEventService, atLeastOnce()).handleEvent(captor.capture());
         Assert.assertNotNull(captor.getValue());
         Assert.assertNotNull(captor.getValue().getEventProperties());
@@ -232,7 +232,7 @@ public class AbstractOTPExecutorTest {
         ArgumentCaptor<Event> captor = ArgumentCaptor.forClass(Event.class);
         OTP otp = testOTPExecutor.generateOTP(CARBON_SUPER);
         flowExecutionContext.setProperty(OTPExecutorConstants.OTP, otp);
-        testOTPExecutor.publishPostOTPValidationEvent(flowExecutionContext, false, true);
+        testOTPExecutor.publishPostOTPValidationEvent(flowExecutionContext, false, true, response);
         verify(identityEventService, atLeastOnce()).handleEvent(captor.capture());
         Assert.assertNotNull(captor.getValue());
         Assert.assertNotNull(captor.getValue().getEventProperties());
@@ -293,7 +293,7 @@ public class AbstractOTPExecutorTest {
     public void testPublishPostOTPGeneratedEventNoOTP() throws FlowEngineException, IdentityEventException {
 
         testOTPExecutor.publishPostOTPGeneratedEvent(OTPExecutorConstants.OTPScenarios.INITIAL_OTP,
-                flowExecutionContext);
+                flowExecutionContext, response);
         verify(identityEventService, atLeast(0)).handleEvent(any());
     }
 
