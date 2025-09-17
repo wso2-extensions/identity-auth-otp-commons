@@ -38,6 +38,7 @@ import org.wso2.carbon.identity.flow.execution.engine.model.ExecutorResponse;
 import org.wso2.carbon.identity.flow.execution.engine.model.FlowExecutionContext;
 
 import java.util.HashMap;
+import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.atLeast;
@@ -188,6 +189,9 @@ public class AbstractOTPExecutorTest {
 
         OTP otp = testOTPExecutor.generateOTP(CARBON_SUPER);
         flowExecutionContext.setProperty(OTPExecutorConstants.OTP, otp);
+        Map<String, Object> contextProperties = response.getContextProperties();
+        contextProperties.put(OTPExecutorConstants.OTP, otp);
+        response.setContextProperty(contextProperties);
         testOTPExecutor.publishPostOTPGeneratedEvent(OTPExecutorConstants.OTPScenarios.INITIAL_OTP,
                 flowExecutionContext, response);
         verify(identityEventService, atLeastOnce()).handleEvent(captor.capture());

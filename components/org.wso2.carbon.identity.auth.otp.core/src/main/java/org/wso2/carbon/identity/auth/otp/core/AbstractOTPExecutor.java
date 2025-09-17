@@ -328,18 +328,24 @@ public abstract class AbstractOTPExecutor extends AuthenticationExecutor {
             throws FlowEngineException {
 
         try {
-            OTP otp = getOTPFromContext(context, response);
-            if (otp != null) {
+            Object value = response.getContextProperties().get(OTP);
+            ObjectMapper objectMapper = new ObjectMapper();
+            HashMap<String, Object> otpMap = objectMapper.convertValue(value,
+                    new TypeReference<HashMap<String, Object>>() {
+                    });
+            if (otpMap != null) {
                 Map<String, Object> eventProperties = new HashMap<>();
                 eventProperties.put(IdentityEventConstants.EventProperty.CORRELATION_ID, context.getCorrelationId());
                 eventProperties.put(IdentityEventConstants.EventProperty.RESEND_CODE,
                         OTPExecutorConstants.OTPScenarios.RESEND_OTP.equals(scenario));
                 eventProperties.put(IdentityEventConstants.EventProperty.TENANT_DOMAIN, context.getTenantDomain());
                 eventProperties.put(NotificationConstants.FLOW_TYPE, REGISTRATION_FLOW);
-                eventProperties.put(IdentityEventConstants.EventProperty.GENERATED_OTP, otp.getValue());
+                eventProperties.put(IdentityEventConstants.EventProperty.GENERATED_OTP,
+                        otpMap.get(OTPExecutorConstants.OTPData.VALUE));
                 eventProperties.put(IdentityEventConstants.EventProperty.OTP_GENERATED_TIME,
-                        otp.getGeneratedTimeInMillis());
-                eventProperties.put(IdentityEventConstants.EventProperty.OTP_EXPIRY_TIME, otp.getGeneratedTimeInMillis()
+                        otpMap.get(OTPExecutorConstants.OTPData.GENERATED_TIME_IN_MILLIS));
+                eventProperties.put(IdentityEventConstants.EventProperty.OTP_EXPIRY_TIME,
+                        (Long) otpMap.get(OTPExecutorConstants.OTPData.GENERATED_TIME_IN_MILLIS)
                         + getOTPValidityPeriod(context.getTenantDomain()));
                 AuthenticatorDataHolder.getIdentityEventService().handleEvent(new Event(getPostOTPGeneratedEventName(),
                         eventProperties));
