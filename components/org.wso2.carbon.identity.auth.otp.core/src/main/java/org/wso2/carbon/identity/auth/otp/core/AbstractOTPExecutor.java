@@ -75,7 +75,11 @@ public abstract class AbstractOTPExecutor extends AuthenticationExecutor {
             }
 
             if (isInitiateRequest(flowExecutionContext)) {
-                initiateExecution(flowExecutionContext, response);
+                if (validateInitiation(flowExecutionContext)) {
+                    initiateExecution(flowExecutionContext, response);
+                } else {
+                    response.setResult(STATUS_USER_INPUT_REQUIRED);
+                }
             } else {
                 processResponse(flowExecutionContext, response);
             }
@@ -260,6 +264,10 @@ public abstract class AbstractOTPExecutor extends AuthenticationExecutor {
     protected void triggerOTP(OTPExecutorConstants.OTPScenarios scenario, FlowExecutionContext context,
                               ExecutorResponse response) throws FlowEngineException {
 
+        // Do not send OTP if the credentials are not managed locally.
+        if (!context.getFlowUser().isCredentialsManagedLocally()) {
+            return;
+        }
         OTP otp = generateOTP(context.getTenantDomain());
         Map<String, Object> contextProperties = response.getContextProperties();
 
@@ -405,6 +413,8 @@ public abstract class AbstractOTPExecutor extends AuthenticationExecutor {
             throw handleAuthErrorScenario(e, "Error occurred while publishing post OTP validation event.");
         }
     }
+
+    abstract protected boolean validateInitiation(FlowExecutionContext context);
 
     private int getCurrentRetryCount(FlowExecutionContext context) {
 
