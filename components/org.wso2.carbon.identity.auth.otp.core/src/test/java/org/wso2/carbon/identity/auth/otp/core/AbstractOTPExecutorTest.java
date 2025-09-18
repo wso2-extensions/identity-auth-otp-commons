@@ -270,7 +270,7 @@ public class AbstractOTPExecutorTest {
         flowExecutionContext.getUserInputData().put(OTPExecutorConstants.OTP, "123456");
         testOTPExecutor.processResponse(flowExecutionContext, response);
         Assert.assertEquals(response.getResult(), STATUS_ERROR);
-        Assert.assertEquals(response.getErrorMessage(), "OTP is not generated.");
+        Assert.assertEquals(response.getErrorMessage(), "{{otp.not.generated.error.message}}");
     }
 
     @Test
@@ -334,7 +334,7 @@ public class AbstractOTPExecutorTest {
         flowExecutionContext.setProperty(OTP_RETRY_COUNT, 5);
         testOTPExecutor.handleMaxRetryCount(flowExecutionContext, response);
         Assert.assertEquals(response.getResult(), STATUS_USER_ERROR);
-        Assert.assertEquals(response.getErrorMessage(), "Maximum retry count exceeded.");
+        Assert.assertEquals(response.getErrorMessage(), "{{otp.max.retry.error.message}}");
     }
 
     @Test

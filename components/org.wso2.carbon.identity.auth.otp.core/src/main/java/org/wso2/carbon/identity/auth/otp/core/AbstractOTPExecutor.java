@@ -163,7 +163,7 @@ public abstract class AbstractOTPExecutor extends AuthenticationExecutor {
                 });
         if (contextOTP == null) {
             response.setResult(Constants.ExecutorStatus.STATUS_ERROR);
-            response.setErrorMessage("OTP is not generated.");
+            response.setErrorMessage("{{otp.not.generated.error.message}}");
             return null;
         }
 
@@ -175,7 +175,7 @@ public abstract class AbstractOTPExecutor extends AuthenticationExecutor {
             validityPeriodInMillis = (Long) contextOTP.get(OTPExecutorConstants.OTPData.VALIDITY_PERIOD_IN_MILLIS);
         } else {
             response.setResult(Constants.ExecutorStatus.STATUS_ERROR);
-            response.setErrorMessage("Invalid OTP data.");
+            response.setErrorMessage("{{otp.error.message}}");
             return null;
         }
 
@@ -198,7 +198,7 @@ public abstract class AbstractOTPExecutor extends AuthenticationExecutor {
 
         if (getCurrentRetryCount(context) >= getMaxRetryCount(context)) {
             response.setResult(STATUS_USER_ERROR);
-            response.setErrorMessage("Maximum retry count exceeded.");
+            response.setErrorMessage("{{otp.max.retry.error.message}}");
         }
     }
 
@@ -214,7 +214,7 @@ public abstract class AbstractOTPExecutor extends AuthenticationExecutor {
 
         String result = response.getResult();
         if (STATUS_RETRY.equals(result)) {
-            response.setErrorMessage("Invalid or expired OTP. Please try again.");
+            response.setErrorMessage("{{otp.error.message}}");
             OTP otp = getOTPFromContext(flowExecutionContext, response);
             if (otp != null && otp.isExpired()) {
                 triggerOTP(OTPExecutorConstants.OTPScenarios.RESEND_OTP, flowExecutionContext, response);
