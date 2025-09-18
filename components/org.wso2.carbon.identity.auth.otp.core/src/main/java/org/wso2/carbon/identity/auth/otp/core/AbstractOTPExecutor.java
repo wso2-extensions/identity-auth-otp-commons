@@ -61,6 +61,8 @@ import static org.wso2.carbon.identity.flow.execution.engine.Constants.ExecutorS
  */
 public abstract class AbstractOTPExecutor extends AuthenticationExecutor {
 
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
     @Override
     public ExecutorResponse execute(FlowExecutionContext flowExecutionContext) {
 
@@ -157,8 +159,7 @@ public abstract class AbstractOTPExecutor extends AuthenticationExecutor {
     private static OTP getOTPFromContext(FlowExecutionContext flowExecutionContext, ExecutorResponse response) {
 
         Object value = flowExecutionContext.getProperty(OTP);
-        ObjectMapper objectMapper = new ObjectMapper();
-        HashMap<String, Object> contextOTP = objectMapper.convertValue(value,
+        HashMap<String, Object> contextOTP = OBJECT_MAPPER.convertValue(value,
                 new TypeReference<HashMap<String, Object>>() {
                 });
         if (contextOTP == null) {
@@ -329,8 +330,7 @@ public abstract class AbstractOTPExecutor extends AuthenticationExecutor {
 
         try {
             Object value = response.getContextProperties().get(OTP);
-            ObjectMapper objectMapper = new ObjectMapper();
-            HashMap<String, Object> otpMap = objectMapper.convertValue(value,
+            HashMap<String, Object> otpMap = OBJECT_MAPPER.convertValue(value,
                     new TypeReference<HashMap<String, Object>>() {
                     });
             if (otpMap != null) {
