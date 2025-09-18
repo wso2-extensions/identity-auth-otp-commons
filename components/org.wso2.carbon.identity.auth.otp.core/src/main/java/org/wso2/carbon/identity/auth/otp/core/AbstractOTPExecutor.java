@@ -139,18 +139,18 @@ public abstract class AbstractOTPExecutor extends AuthenticationExecutor {
             if (inputOTP.equals(otp.getValue())) {
                 if (otp.isExpired()) {
                     response.setResult(STATUS_RETRY);
-                    publishPostOTPValidationEvent(flowExecutionContext, false, true);
+                    publishPostOTPValidationEvent(flowExecutionContext, false, true, response);
                 } else {
                     response.setResult(STATUS_COMPLETE);
                     Map<String, Object> contextProps = response.getContextProperties();
                     contextProps.put(OTP, null);
                     flowExecutionContext.getUserInputData().remove(OTP);
                     handleClaimUpdate(flowExecutionContext, response);
-                    publishPostOTPValidationEvent(flowExecutionContext, true, false);
+                    publishPostOTPValidationEvent(flowExecutionContext, true, false, response);
                 }
             } else {
                 response.setResult(STATUS_RETRY);
-                publishPostOTPValidationEvent(flowExecutionContext, false, false);
+                publishPostOTPValidationEvent(flowExecutionContext, false, false, response);
             }
     }
 
@@ -163,7 +163,7 @@ public abstract class AbstractOTPExecutor extends AuthenticationExecutor {
                 });
         if (contextOTP == null) {
             response.setResult(Constants.ExecutorStatus.STATUS_ERROR);
-            response.setErrorMessage("OTP is not generated.");
+            response.setErrorMessage("{{otp.not.generated.error.message}}");
             return null;
         }
 
@@ -175,7 +175,7 @@ public abstract class AbstractOTPExecutor extends AuthenticationExecutor {
             validityPeriodInMillis = (Long) contextOTP.get(OTPExecutorConstants.OTPData.VALIDITY_PERIOD_IN_MILLIS);
         } else {
             response.setResult(Constants.ExecutorStatus.STATUS_ERROR);
-            response.setErrorMessage("Invalid OTP data.");
+            response.setErrorMessage("{{otp.error.message}}");
             return null;
         }
 
@@ -198,7 +198,7 @@ public abstract class AbstractOTPExecutor extends AuthenticationExecutor {
 
         if (getCurrentRetryCount(context) >= getMaxRetryCount(context)) {
             response.setResult(STATUS_USER_ERROR);
-            response.setErrorMessage("Maximum retry count exceeded.");
+            response.setErrorMessage("{{otp.max.retry.error.message}}");
         }
     }
 
@@ -214,8 +214,8 @@ public abstract class AbstractOTPExecutor extends AuthenticationExecutor {
 
         String result = response.getResult();
         if (STATUS_RETRY.equals(result)) {
-            response.setErrorMessage("Invalid or expired OTP. Please try again.");
-            OTP otp = (OTP) flowExecutionContext.getProperty(OTP);
+            response.setErrorMessage("{{otp.error.message}}");
+            OTP otp = getOTPFromContext(flowExecutionContext, response);
             if (otp != null && otp.isExpired()) {
                 triggerOTP(OTPExecutorConstants.OTPScenarios.RESEND_OTP, flowExecutionContext, response);
                 return;
@@ -269,7 +269,7 @@ public abstract class AbstractOTPExecutor extends AuthenticationExecutor {
         otpData.put(OTPExecutorConstants.OTPData.EXPIRY_TIME_IN_MILLIS, otp.getExpiryTimeInMillis());
 
         contextProperties.put(OTP, otpData);
-        publishPostOTPGeneratedEvent(scenario, context);
+        publishPostOTPGeneratedEvent(scenario, context, response);
 
         Map<String, String> info = new HashMap<>();
         info.put(OTPExecutorConstants.OTP_LENGTH, String.valueOf(getOTPLength(context.getTenantDomain())));
@@ -323,22 +323,29 @@ public abstract class AbstractOTPExecutor extends AuthenticationExecutor {
      * @param context  Registration context.
      * @throws FlowEngineException if an error occurs while publishing the event.
      */
-    protected void publishPostOTPGeneratedEvent(OTPExecutorConstants.OTPScenarios scenario, FlowExecutionContext context)
+    protected void publishPostOTPGeneratedEvent(OTPExecutorConstants.OTPScenarios scenario, FlowExecutionContext context,
+                                                ExecutorResponse response)
             throws FlowEngineException {
 
         try {
-            OTP otp = (OTP) context.getProperty(OTP);
-            if (otp != null) {
+            Object value = response.getContextProperties().get(OTP);
+            ObjectMapper objectMapper = new ObjectMapper();
+            HashMap<String, Object> otpMap = objectMapper.convertValue(value,
+                    new TypeReference<HashMap<String, Object>>() {
+                    });
+            if (otpMap != null) {
                 Map<String, Object> eventProperties = new HashMap<>();
                 eventProperties.put(IdentityEventConstants.EventProperty.CORRELATION_ID, context.getCorrelationId());
                 eventProperties.put(IdentityEventConstants.EventProperty.RESEND_CODE,
                         OTPExecutorConstants.OTPScenarios.RESEND_OTP.equals(scenario));
                 eventProperties.put(IdentityEventConstants.EventProperty.TENANT_DOMAIN, context.getTenantDomain());
                 eventProperties.put(NotificationConstants.FLOW_TYPE, REGISTRATION_FLOW);
-                eventProperties.put(IdentityEventConstants.EventProperty.GENERATED_OTP, otp.getValue());
+                eventProperties.put(IdentityEventConstants.EventProperty.GENERATED_OTP,
+                        otpMap.get(OTPExecutorConstants.OTPData.VALUE));
                 eventProperties.put(IdentityEventConstants.EventProperty.OTP_GENERATED_TIME,
-                        otp.getGeneratedTimeInMillis());
-                eventProperties.put(IdentityEventConstants.EventProperty.OTP_EXPIRY_TIME, otp.getGeneratedTimeInMillis()
+                        otpMap.get(OTPExecutorConstants.OTPData.GENERATED_TIME_IN_MILLIS));
+                eventProperties.put(IdentityEventConstants.EventProperty.OTP_EXPIRY_TIME,
+                        (Long) otpMap.get(OTPExecutorConstants.OTPData.GENERATED_TIME_IN_MILLIS)
                         + getOTPValidityPeriod(context.getTenantDomain()));
                 AuthenticatorDataHolder.getIdentityEventService().handleEvent(new Event(getPostOTPGeneratedEventName(),
                         eventProperties));
@@ -359,7 +366,7 @@ public abstract class AbstractOTPExecutor extends AuthenticationExecutor {
      * @throws FlowEngineException if an error occurs while publishing the event.
      */
     protected void publishPostOTPValidationEvent(FlowExecutionContext context, boolean isAuthenticationPassed,
-                                                 boolean isExpired)
+                                                 boolean isExpired, ExecutorResponse response)
             throws FlowEngineException {
 
         try {
@@ -379,7 +386,7 @@ public abstract class AbstractOTPExecutor extends AuthenticationExecutor {
             } else if (isExpired) {
                 eventProperties.put(IdentityEventConstants.EventProperty.OTP_STATUS,
                         OTPExecutorConstants.Status.OTP_EXPIRED);
-                OTP otp = (OTP) context.getProperty(OTP);
+                OTP otp = getOTPFromContext(context, response);
                 if (otp != null) {
                     eventProperties.put(IdentityEventConstants.EventProperty.OTP_GENERATED_TIME,
                             otp.getGeneratedTimeInMillis());

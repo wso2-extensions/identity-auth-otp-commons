@@ -38,6 +38,7 @@ import org.wso2.carbon.identity.flow.execution.engine.model.ExecutorResponse;
 import org.wso2.carbon.identity.flow.execution.engine.model.FlowExecutionContext;
 
 import java.util.HashMap;
+import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.atLeast;
@@ -188,8 +189,11 @@ public class AbstractOTPExecutorTest {
 
         OTP otp = testOTPExecutor.generateOTP(CARBON_SUPER);
         flowExecutionContext.setProperty(OTPExecutorConstants.OTP, otp);
+        Map<String, Object> contextProperties = response.getContextProperties();
+        contextProperties.put(OTPExecutorConstants.OTP, otp);
+        response.setContextProperty(contextProperties);
         testOTPExecutor.publishPostOTPGeneratedEvent(OTPExecutorConstants.OTPScenarios.INITIAL_OTP,
-                flowExecutionContext);
+                flowExecutionContext, response);
         verify(identityEventService, atLeastOnce()).handleEvent(captor.capture());
         Assert.assertNotNull(captor.getValue());
         Assert.assertNotNull(captor.getValue().getEventProperties());
@@ -202,7 +206,7 @@ public class AbstractOTPExecutorTest {
         ArgumentCaptor<Event> captor = ArgumentCaptor.forClass(Event.class);
         OTP otp = testOTPExecutor.generateOTP(CARBON_SUPER);
         flowExecutionContext.setProperty(OTPExecutorConstants.OTP, otp);
-        testOTPExecutor.publishPostOTPValidationEvent(flowExecutionContext, true, false);
+        testOTPExecutor.publishPostOTPValidationEvent(flowExecutionContext, true, false, response);
         verify(identityEventService, atLeastOnce()).handleEvent(captor.capture());
         Assert.assertNotNull(captor.getValue());
         Assert.assertNotNull(captor.getValue().getEventProperties());
@@ -217,7 +221,7 @@ public class AbstractOTPExecutorTest {
         ArgumentCaptor<Event> captor = ArgumentCaptor.forClass(Event.class);
         OTP otp = testOTPExecutor.generateOTP(CARBON_SUPER);
         flowExecutionContext.setProperty(OTPExecutorConstants.OTP, otp);
-        testOTPExecutor.publishPostOTPValidationEvent(flowExecutionContext, false, false);
+        testOTPExecutor.publishPostOTPValidationEvent(flowExecutionContext, false, false, response);
         verify(identityEventService, atLeastOnce()).handleEvent(captor.capture());
         Assert.assertNotNull(captor.getValue());
         Assert.assertNotNull(captor.getValue().getEventProperties());
@@ -232,7 +236,7 @@ public class AbstractOTPExecutorTest {
         ArgumentCaptor<Event> captor = ArgumentCaptor.forClass(Event.class);
         OTP otp = testOTPExecutor.generateOTP(CARBON_SUPER);
         flowExecutionContext.setProperty(OTPExecutorConstants.OTP, otp);
-        testOTPExecutor.publishPostOTPValidationEvent(flowExecutionContext, false, true);
+        testOTPExecutor.publishPostOTPValidationEvent(flowExecutionContext, false, true, response);
         verify(identityEventService, atLeastOnce()).handleEvent(captor.capture());
         Assert.assertNotNull(captor.getValue());
         Assert.assertNotNull(captor.getValue().getEventProperties());
@@ -266,7 +270,7 @@ public class AbstractOTPExecutorTest {
         flowExecutionContext.getUserInputData().put(OTPExecutorConstants.OTP, "123456");
         testOTPExecutor.processResponse(flowExecutionContext, response);
         Assert.assertEquals(response.getResult(), STATUS_ERROR);
-        Assert.assertEquals(response.getErrorMessage(), "OTP is not generated.");
+        Assert.assertEquals(response.getErrorMessage(), "{{otp.not.generated.error.message}}");
     }
 
     @Test
@@ -293,7 +297,7 @@ public class AbstractOTPExecutorTest {
     public void testPublishPostOTPGeneratedEventNoOTP() throws FlowEngineException, IdentityEventException {
 
         testOTPExecutor.publishPostOTPGeneratedEvent(OTPExecutorConstants.OTPScenarios.INITIAL_OTP,
-                flowExecutionContext);
+                flowExecutionContext, response);
         verify(identityEventService, atLeast(0)).handleEvent(any());
     }
 
@@ -330,7 +334,7 @@ public class AbstractOTPExecutorTest {
         flowExecutionContext.setProperty(OTP_RETRY_COUNT, 5);
         testOTPExecutor.handleMaxRetryCount(flowExecutionContext, response);
         Assert.assertEquals(response.getResult(), STATUS_USER_ERROR);
-        Assert.assertEquals(response.getErrorMessage(), "Maximum retry count exceeded.");
+        Assert.assertEquals(response.getErrorMessage(), "{{otp.max.retry.error.message}}");
     }
 
     @Test
