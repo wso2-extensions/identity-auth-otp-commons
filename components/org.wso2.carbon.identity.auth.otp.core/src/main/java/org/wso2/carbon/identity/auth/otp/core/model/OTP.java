@@ -23,7 +23,7 @@ import java.io.Serializable;
 /**
  * A class to keep OTP related data.
  */
-public class OTP implements Serializable{
+public class OTP implements Serializable {
 
     private final String value;
     private final long generatedTimeInMillis;
