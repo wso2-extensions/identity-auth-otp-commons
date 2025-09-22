@@ -22,6 +22,8 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.commons.lang.StringUtils;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.wso2.carbon.identity.auth.otp.core.constant.OTPExecutorConstants;
 import org.wso2.carbon.identity.auth.otp.core.internal.AuthenticatorDataHolder;
 import org.wso2.carbon.identity.auth.otp.core.model.OTP;
@@ -63,6 +65,8 @@ public abstract class AbstractOTPExecutor extends AuthenticationExecutor {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
+    private static final Log LOG = LogFactory.getLog(AbstractOTPExecutor.class);
+
     @Override
     public ExecutorResponse execute(FlowExecutionContext flowExecutionContext) {
 
@@ -75,7 +79,11 @@ public abstract class AbstractOTPExecutor extends AuthenticationExecutor {
             }
 
             if (isInitiateRequest(flowExecutionContext)) {
-                initiateExecution(flowExecutionContext, response);
+                if (validateInitiation(flowExecutionContext)) {
+                    initiateExecution(flowExecutionContext, response);
+                } else {
+                    response.setResult(STATUS_USER_INPUT_REQUIRED);
+                }
             } else {
                 processResponse(flowExecutionContext, response);
             }
@@ -260,6 +268,18 @@ public abstract class AbstractOTPExecutor extends AuthenticationExecutor {
     protected void triggerOTP(OTPExecutorConstants.OTPScenarios scenario, FlowExecutionContext context,
                               ExecutorResponse response) throws FlowEngineException {
 
+        // Do not send OTP if the credentials are not managed locally or the account is locked/disabled.
+        if (!context.getFlowUser().isCredentialsManagedLocally() || context.getFlowUser().isAccountLocked() ||
+                context.getFlowUser().isAccountDisabled()) {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Skipping OTP sending as the user account is either locked/disabled or the credentials " +
+                        "are not managed locally.");
+            }
+            logDiagnostic("Skipping OTP sending as the user account is either locked/disabled or the " +
+                            "credentials are not managed locally.",
+                    DiagnosticLog.ResultStatus.SUCCESS, SEND_OTP);
+            return;
+        }
         OTP otp = generateOTP(context.getTenantDomain());
         Map<String, Object> contextProperties = response.getContextProperties();
 
@@ -405,6 +425,8 @@ public abstract class AbstractOTPExecutor extends AuthenticationExecutor {
             throw handleAuthErrorScenario(e, "Error occurred while publishing post OTP validation event.");
         }
     }
+
+    abstract protected boolean validateInitiation(FlowExecutionContext context);
 
     private int getCurrentRetryCount(FlowExecutionContext context) {
 

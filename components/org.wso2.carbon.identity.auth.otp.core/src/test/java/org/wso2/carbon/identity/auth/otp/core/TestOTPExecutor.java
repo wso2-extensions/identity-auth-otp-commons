@@ -143,4 +143,9 @@ public class TestOTPExecutor extends AbstractOTPExecutor {
 
         return getName();
     }
+
+    protected boolean validateInitiation(FlowExecutionContext context) {
+
+        return true;
+    }
 }
