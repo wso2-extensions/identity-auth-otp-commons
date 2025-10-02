@@ -34,6 +34,7 @@ public class AuthenticatorConstants {
     public static final String INVALID_USERNAME = "invalidUsername";
     public static final String FAILED_LOGIN_ATTEMPTS_CLAIM_URI = "http://wso2.org/claims/identity/failedLoginAttempts";
     public static final String HIDE_USER_EXISTENCE_CONFIG = "LocalAuthenticators.HideUserExistenceOnAuthFlow";
+    public static final String MULTIPLE_USERS_ERROR_MESSAGE = "There are more than one user with the provided username";
 
     // OTP generation.
     public static final String OTP_NUMERIC_CHAR_SET = "9245378016";
