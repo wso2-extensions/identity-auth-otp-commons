@@ -48,6 +48,7 @@ import org.wso2.carbon.identity.captcha.util.CaptchaConstants;
 import org.wso2.carbon.identity.captcha.util.CaptchaUtil;
 import org.wso2.carbon.identity.core.util.IdentityConfigParser;
 import org.wso2.carbon.identity.core.util.IdentityTenantUtil;
+import org.wso2.carbon.identity.core.util.IdentityUtil;
 import org.wso2.carbon.identity.event.IdentityEventConstants;
 import org.wso2.carbon.identity.event.IdentityEventException;
 import org.wso2.carbon.identity.event.event.Event;
@@ -195,7 +196,24 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
                 // If the request is returned from the Identifier First page, resolve the user and set them in context.
                 context.removeProperty(IS_IDF_INITIATED_FROM_AUTHENTICATOR);
                 AuthenticatedUser authenticatedUser = resolveUserFromRequest(request, context);
-                authenticatedUserFromContext = resolveUserFromUserStore(authenticatedUser, context);
+                try {
+                    authenticatedUserFromContext = resolveUserFromUserStore(authenticatedUser, context);
+                } catch (AuthenticationFailedException e) {
+                    // Check if the exception is specifically about multiple users
+                    if (e.getMessage() != null &&
+                            e.getMessage().contains(AuthenticatorConstants.MULTIPLE_USERS_ERROR_MESSAGE)) {
+                        if (LOG.isDebugEnabled()) {
+                            LOG.debug("Multiple users found for the provided username", e);
+                        }
+
+                        if (isOTPAsFirstFactor(context) &&
+                                Boolean.parseBoolean(IdentityUtil.getProperty(AuthenticatorConstants.HIDE_USER_EXISTENCE_CONFIG))) {
+                            redirectToOTPLoginPage(authenticatedUser, applicationTenantDomain, false, response, request, context);
+                            return;
+                        }
+                    }
+                    throw e;
+                }
                 setResolvedUserInContext(context, authenticatedUserFromContext);
             } else if (isPreviousIdPAuthenticationFlowHandler(context)) {
                 /*
