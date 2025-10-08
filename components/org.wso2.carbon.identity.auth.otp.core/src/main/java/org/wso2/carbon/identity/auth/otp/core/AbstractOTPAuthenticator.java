@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, WSO2 LLC. (http://www.wso2.com).
+ * Copyright (c) 2023-2025, WSO2 LLC. (http://www.wso2.com).
  *
  * WSO2 LLC. licenses this file to you under the Apache License,
  * Version 2.0 (the "License"); you may not use this file except
@@ -1121,7 +1121,7 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
         if (StringUtils.isBlank(identifierFromRequest)) {
             throw handleAuthErrorScenario(ERROR_CODE_EMPTY_USERNAME);
         }
-        String username = FrameworkUtils.preprocessUsername(identifierFromRequest, context);
+        String username = FrameworkUtils.preprocessUsernameWithContextTenantDomain(identifierFromRequest, context);
         AuthenticatedUser user = new AuthenticatedUser();
         String tenantAwareUsername = MultitenantUtils.getTenantAwareUsername(username);
         String userStoreDomain = UserCoreUtil.extractDomainFromName(username);
