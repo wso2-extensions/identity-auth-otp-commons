@@ -22,6 +22,7 @@
     <test name="org.wso2.carbon.identity.auth.otp.core.tests" preserve-order="true" parallel="false">
         <classes>
             <class name="org.wso2.carbon.identity.auth.otp.core.AbstractOTPExecutorTest"/>
+            <class name="org.wso2.carbon.identity.auth.otp.core.AbstractOTPAuthenticatorTest"/>
         </classes>
     </test>
 </suite>
