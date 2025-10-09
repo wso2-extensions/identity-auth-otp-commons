@@ -49,12 +49,14 @@ import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.verify;
 import static org.wso2.carbon.identity.auth.otp.core.constant.OTPExecutorConstants.OTP_LENGTH;
 import static org.wso2.carbon.identity.auth.otp.core.constant.OTPExecutorConstants.OTP_RETRY_COUNT;
+import static org.wso2.carbon.identity.auth.otp.core.constant.OTPExecutorConstants.OTP_RESEND_COUNT;
 import static org.wso2.carbon.identity.event.IdentityEventConstants.EventProperty.GENERATED_OTP;
 import static org.wso2.carbon.identity.event.IdentityEventConstants.EventProperty.OTP_STATUS;
 import static org.wso2.carbon.identity.event.IdentityEventConstants.EventProperty.OTP_USED_TIME;
 import static org.wso2.carbon.identity.flow.execution.engine.Constants.ExecutorStatus.STATUS_COMPLETE;
 import static org.wso2.carbon.identity.flow.execution.engine.Constants.ExecutorStatus.STATUS_ERROR;
 import static org.wso2.carbon.identity.flow.execution.engine.Constants.ExecutorStatus.STATUS_RETRY;
+import static org.wso2.carbon.identity.flow.execution.engine.Constants.ExecutorStatus.STATUS_USER_INPUT_REQUIRED;
 import static org.wso2.carbon.identity.flow.execution.engine.Constants.ExecutorStatus.STATUS_USER_ERROR;
 
 /**
@@ -121,13 +123,44 @@ public class AbstractOTPExecutorTest {
     }
 
     @Test
+    public void testIsResendRequest() {
+
+        Assert.assertFalse(testOTPExecutor.isResendRequest(flowExecutionContext));
+
+        flowExecutionContext.getUserInputData().put(OTPExecutorConstants.RESEND, "true");
+        Assert.assertTrue(testOTPExecutor.isResendRequest(flowExecutionContext));
+    }
+
+    @Test
     public void testInitiateExecution() throws FlowEngineException {
 
         response.setContextProperty(new HashMap<>());
         testOTPExecutor.initiateExecution(flowExecutionContext, response);
         Assert.assertNotNull(response.getContextProperties().get(OTPExecutorConstants.OTP));
-        Assert.assertNotNull(response.getRequiredData().get(0));
-        Assert.assertEquals(response.getRequiredData().get(0), OTPExecutorConstants.OTP);
+    }
+
+    @Test
+    public void testHandleResendRequestFlow() {
+
+        flowExecutionContext.setProperty(OTP_RETRY_COUNT, 1);
+        flowExecutionContext.getUserInputData().put(OTPExecutorConstants.RESEND, "true");
+
+        ExecutorResponse executorResponse = testOTPExecutor.execute(flowExecutionContext);
+        Assert.assertEquals(executorResponse.getResult(), STATUS_USER_INPUT_REQUIRED);
+        Assert.assertEquals(executorResponse.getContextProperties().get(OTP_RESEND_COUNT), 1);
+    }
+
+    @Test
+    public void testHandleResendRequestMaxExceeded() {
+
+        flowExecutionContext.setProperty(OTP_RETRY_COUNT, 2);
+        flowExecutionContext.setProperty(OTP_RESEND_COUNT,
+                testOTPExecutor.getMaxResendCount(flowExecutionContext));
+        flowExecutionContext.getUserInputData().put(OTPExecutorConstants.RESEND, "true");
+
+        ExecutorResponse executorResponse = testOTPExecutor.execute(flowExecutionContext);
+        Assert.assertEquals(executorResponse.getResult(), STATUS_USER_ERROR);
+        Assert.assertEquals(executorResponse.getErrorMessage(), "{{otp.max.resend.error.message}}");
     }
 
     @Test
@@ -162,6 +195,8 @@ public class AbstractOTPExecutorTest {
         flowExecutionContext.setProperty(OTPExecutorConstants.OTP, new OTP("123456", 0, 0));
         testOTPExecutor.handleRetry(flowExecutionContext, response);
         Assert.assertNull(response.getContextProperties().get(OTP_RETRY_COUNT));
+        Assert.assertEquals(response.getContextProperties().get(OTP_RESEND_COUNT), 1);
+        Assert.assertEquals(flowExecutionContext.getProperty(OTP_RESEND_COUNT), 1);
     }
 
     @Test
@@ -324,8 +359,12 @@ public class AbstractOTPExecutorTest {
 
         response.setResult(STATUS_COMPLETE);
         response.getContextProperties().put(OTP_RETRY_COUNT, 2);
+        response.getContextProperties().put(OTP_RESEND_COUNT, 1);
+        flowExecutionContext.setProperty(OTP_RESEND_COUNT, 1);
         testOTPExecutor.handleRetry(flowExecutionContext, response);
         Assert.assertNull(response.getContextProperties().get(OTP_RETRY_COUNT));
+        Assert.assertNull(response.getContextProperties().get(OTP_RESEND_COUNT));
+        Assert.assertNull(flowExecutionContext.getProperty(OTP_RESEND_COUNT));
     }
 
     @Test

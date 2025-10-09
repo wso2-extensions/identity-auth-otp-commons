@@ -29,7 +29,9 @@ public class OTPExecutorConstants {
 
     public static final String OTP = "otp";
     public static final String OTP_RETRY_COUNT = "otpRetryCount";
+    public static final String OTP_RESEND_COUNT = "otpResendCount";
     public static final String OTP_LENGTH = "otpLength";
+    public static final String RESEND = "resend";
 
     public enum OTPScenarios {
 
