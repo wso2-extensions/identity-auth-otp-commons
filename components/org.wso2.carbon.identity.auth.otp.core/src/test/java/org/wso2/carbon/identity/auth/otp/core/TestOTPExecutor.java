@@ -41,6 +41,7 @@ public class TestOTPExecutor extends AbstractOTPExecutor {
     private static final int DEFAULT_OTP_LENGTH = 6;
     private static final long DEFAULT_OTP_VALIDITY = 60000L;
     private static final int DEFAULT_MAX_RETRY = 3;
+    private static final int DEFAULT_MAX_RESEND = 2;
 
 
     @Override
@@ -73,7 +74,7 @@ public class TestOTPExecutor extends AbstractOTPExecutor {
     @Override
     protected int getMaxResendCount(FlowExecutionContext registrationContext) {
 
-        return DEFAULT_MAX_RETRY;
+        return DEFAULT_MAX_RESEND;
     }
 
     @Override

@@ -85,6 +85,10 @@ public abstract class AbstractOTPExecutor extends AuthenticationExecutor {
                     response.setResult(STATUS_USER_INPUT_REQUIRED);
                 }
             } else {
+                if (isResendRequest(flowExecutionContext)) {
+                    handleResend(flowExecutionContext, response);
+                    return response;
+                }
                 processResponse(flowExecutionContext, response);
             }
             handleRetry(flowExecutionContext, response);
@@ -111,6 +115,26 @@ public abstract class AbstractOTPExecutor extends AuthenticationExecutor {
     }
 
     /**
+     * Checks whether the request is for resending the OTP.
+     *
+     * @param flowExecutionContext Flow execution context.
+     * @return {@code true} if the request is a resend request, {@code false} otherwise.
+     */
+    protected boolean isResendRequest(FlowExecutionContext flowExecutionContext) {
+
+        Map<String, String> userInputData = flowExecutionContext.getUserInputData();
+        if (userInputData == null || userInputData.isEmpty()) {
+            return false;
+        }
+
+        String resendParameter = userInputData.get(OTPExecutorConstants.RESEND);
+        if (StringUtils.isNotBlank(resendParameter)) {
+            return Boolean.parseBoolean(resendParameter);
+        }
+        return false;
+    }
+
+    /**
      * This method is used to initiate the OTP execution.
      *
      * @param flowExecutionContext Registration context.
@@ -121,10 +145,35 @@ public abstract class AbstractOTPExecutor extends AuthenticationExecutor {
             throws FlowEngineException {
 
         response.setResult(STATUS_USER_INPUT_REQUIRED);
-        List<String> requiredData = new ArrayList<>();
-        requiredData.add(OTPExecutorConstants.OTP);
-        response.setRequiredData(requiredData);
+        List<String> data = new ArrayList<>();
+        data.add(OTPExecutorConstants.OTP);
+        data.add(OTPExecutorConstants.RESEND);
+        response.setOptionalData(data);
         triggerOTP(OTPExecutorConstants.OTPScenarios.INITIAL_OTP, flowExecutionContext, response);
+    }
+
+    /**
+     * Handles OTP resend requests by triggering the resend flow.
+     *
+     * @param flowExecutionContext Flow execution context.
+     * @param response             Executor response.
+     * @throws FlowEngineException If an error occurs while handling the resend request.
+     */
+    protected void handleResend(FlowExecutionContext flowExecutionContext, ExecutorResponse response)
+            throws FlowEngineException {
+
+        handleMaxResendCount(flowExecutionContext, response);
+        if (STATUS_USER_ERROR.equals(response.getResult())) {
+            return;
+        }
+
+        response.setResult(STATUS_USER_INPUT_REQUIRED);
+        List<String> data = new ArrayList<>();
+        data.add(OTPExecutorConstants.OTP);
+        data.add(OTPExecutorConstants.RESEND);
+        response.setOptionalData(data);
+        triggerOTP(OTPExecutorConstants.OTPScenarios.RESEND_OTP, flowExecutionContext, response);
+        updateResendCount(flowExecutionContext, response);
     }
 
     /**
@@ -212,6 +261,22 @@ public abstract class AbstractOTPExecutor extends AuthenticationExecutor {
     }
 
     /**
+     * This method is used to handle the maximum resend count.
+     *
+     * @param context  Flow execution context.
+     * @param response Executor response.
+     * @throws FlowEngineException if an error occurs while handling the maximum resend count.
+     */
+    protected void handleMaxResendCount(FlowExecutionContext context, ExecutorResponse response)
+            throws FlowEngineException {
+
+        if (getCurrentResendCount(context) >= getMaxResendCount(context)) {
+            response.setResult(STATUS_USER_ERROR);
+            response.setErrorMessage("{{otp.max.resend.error.message}}");
+        }
+    }
+
+    /**
      * This method is used to handle the retry count.
      *
      * @param flowExecutionContext Registration context.
@@ -226,15 +291,26 @@ public abstract class AbstractOTPExecutor extends AuthenticationExecutor {
             response.setErrorMessage("{{otp.error.message}}");
             OTP otp = getOTPFromContext(flowExecutionContext, response);
             if (otp != null && otp.isExpired()) {
+                handleMaxResendCount(flowExecutionContext, response);
+                if (STATUS_USER_ERROR.equals(response.getResult())) {
+                    return;
+                }
                 triggerOTP(OTPExecutorConstants.OTPScenarios.RESEND_OTP, flowExecutionContext, response);
+                updateResendCount(flowExecutionContext, response);
                 return;
             }
         } else if (STATUS_COMPLETE.equals(result)) {
             flowExecutionContext.setProperty(OTP_RETRY_COUNT, null);
             response.getContextProperties().remove(OTP_RETRY_COUNT);
+            flowExecutionContext.setProperty(OTPExecutorConstants.OTP_RESEND_COUNT, null);
+            response.getContextProperties().remove(OTPExecutorConstants.OTP_RESEND_COUNT);
             return;
         }
         response.getContextProperties().put(OTP_RETRY_COUNT, getCurrentRetryCount(flowExecutionContext) + 1);
+        List<String> data = new ArrayList<>();
+        data.add(OTPExecutorConstants.OTP);
+        data.add(OTPExecutorConstants.RESEND);
+        response.setOptionalData(data);
     }
 
     /**
@@ -431,6 +507,18 @@ public abstract class AbstractOTPExecutor extends AuthenticationExecutor {
     private int getCurrentRetryCount(FlowExecutionContext context) {
 
         return Optional.ofNullable((Integer) context.getProperty(OTP_RETRY_COUNT)).orElse(0);
+    }
+
+    private int getCurrentResendCount(FlowExecutionContext context) {
+
+        return Optional.ofNullable((Integer) context.getProperty(OTPExecutorConstants.OTP_RESEND_COUNT)).orElse(0);
+    }
+
+    private void updateResendCount(FlowExecutionContext context, ExecutorResponse response) {
+
+        int resendCount = getCurrentResendCount(context) + 1;
+        context.setProperty(OTPExecutorConstants.OTP_RESEND_COUNT, resendCount);
+        response.getContextProperties().put(OTPExecutorConstants.OTP_RESEND_COUNT, resendCount);
     }
 
     abstract protected Event getSendOTPEvent(OTPExecutorConstants.OTPScenarios otpScenario, OTP otp,
