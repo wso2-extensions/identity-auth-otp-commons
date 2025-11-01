@@ -27,14 +27,17 @@ import org.wso2.carbon.extension.identity.helper.FederatedAuthenticatorUtil;
 import org.wso2.carbon.identity.application.authentication.framework.AbstractApplicationAuthenticator;
 import org.wso2.carbon.identity.application.authentication.framework.AuthenticationFlowHandler;
 import org.wso2.carbon.identity.application.authentication.framework.AuthenticatorFlowStatus;
+import org.wso2.carbon.identity.application.authentication.framework.FederatedApplicationAuthenticator;
 import org.wso2.carbon.identity.application.authentication.framework.config.ConfigurationFacade;
 import org.wso2.carbon.identity.application.authentication.framework.config.model.StepConfig;
 import org.wso2.carbon.identity.application.authentication.framework.context.AuthenticationContext;
 import org.wso2.carbon.identity.application.authentication.framework.exception.AuthenticationFailedException;
 import org.wso2.carbon.identity.application.authentication.framework.exception.InvalidCredentialsException;
 import org.wso2.carbon.identity.application.authentication.framework.exception.LogoutFailedException;
+import org.wso2.carbon.identity.application.authentication.framework.exception.PostAuthenticationFailedException;
 import org.wso2.carbon.identity.application.authentication.framework.model.AuthenticatedIdPData;
 import org.wso2.carbon.identity.application.authentication.framework.model.AuthenticatedUser;
+import org.wso2.carbon.identity.application.authentication.framework.util.FrameworkConstants;
 import org.wso2.carbon.identity.application.authentication.framework.util.FrameworkUtils;
 import org.wso2.carbon.identity.application.common.model.IdentityProvider;
 import org.wso2.carbon.identity.application.common.model.JustInTimeProvisioningConfig;
@@ -142,6 +145,9 @@ import static org.wso2.carbon.user.core.UserCoreConstants.PRIMARY_DEFAULT_DOMAIN
 public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthenticator {
 
     private static final Log LOG = LogFactory.getLog(AbstractOTPAuthenticator.class);
+    boolean isConfiguredIdpSubAssociationEnabled =
+            Boolean.parseBoolean(IdentityUtil.
+                    getProperty(FrameworkConstants.ENABLE_CONFIGURED_IDP_SUB_FOR_FEDERATED_USER_ASSOCIATION));
 
     @Override
     public AuthenticatorFlowStatus process(HttpServletRequest request, HttpServletResponse response,
@@ -178,7 +184,7 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
         if (isLoginAttemptByInvalidUser(context, authenticatedUserFromContext)) {
             AuthenticatedUser invalidUser = new AuthenticatedUser();
             invalidUser.setUserName((String) context.getProperty(INVALID_USERNAME));
-            redirectToOTPLoginPage(invalidUser, applicationTenantDomain, false,
+            redirectToOTPLoginPage(null, invalidUser, applicationTenantDomain, false,
                     response, request, context);
             return;
         }
@@ -208,7 +214,7 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
 
                         if (isOTPAsFirstFactor(context) &&
                                 Boolean.parseBoolean(IdentityUtil.getProperty(AuthenticatorConstants.HIDE_USER_EXISTENCE_CONFIG))) {
-                            redirectToOTPLoginPage(authenticatedUser, applicationTenantDomain, false, response, request, context);
+                            redirectToOTPLoginPage(null, authenticatedUser, applicationTenantDomain, false, response, request, context);
                             return;
                         }
                     }
@@ -229,7 +235,7 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
                 invalidUser.setUserName(request.getParameter(USERNAME));
                 context.setProperty(IS_LOGIN_ATTEMPT_BY_INVALID_USER, true);
                 context.setProperty(INVALID_USERNAME, request.getParameter(USERNAME));
-                redirectToOTPLoginPage(invalidUser, applicationTenantDomain, false,
+                redirectToOTPLoginPage(null, invalidUser, applicationTenantDomain, false,
                         response, request, context);
                 return;
             }
@@ -271,6 +277,13 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
             throw new AuthenticationFailedException(ERROR_CODE_GETTING_ACCOUNT_STATE.getCode(), error, e);
         }
         AuthenticatorConstants.AuthenticationScenarios scenario = resolveScenario(request, context);
+
+        String mobile = null;
+        if (isConfiguredIdpSubAssociationEnabled) {
+            mobile = getUserClaimValueFromUserStore("http://wso2.org/claims/mobile",
+                    authenticatingUser, ERROR_CODE_ERROR_GETTING_USER_CLAIM);
+        }
+
         if (scenario == INITIAL_OTP || scenario == RESEND_OTP) {
             if (scenario == RESEND_OTP && context.getProperty(OTP_RESEND_ATTEMPTS) != null) {
                 if (!StringUtils.isBlank(context.getProperty(OTP_RESEND_ATTEMPTS).toString())) {
@@ -289,7 +302,7 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
              * to triggered against the context user.
              */
             try {
-                sendOtp(authenticatedUserFromContext, otp, isInitialFederationAttempt, request, response, context);
+                sendOtp(mobile, authenticatingUser, otp, isInitialFederationAttempt, request, response, context);
                 LOG.debug("OTP code was sent successfully.");
             } catch (AuthenticationFailedException exception) {
                 String errorGettingUserClaimErrorCode = getAuthenticatorErrorPrefix() + "-"
@@ -298,7 +311,7 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
                         + ERROR_CODE_NO_MOBILE_NUMBER_FOUND.getCode();
                 if (errorGettingUserClaimErrorCode.equals(exception.getErrorCode())) {
                     if (isOTPAsFirstFactor(context)) {
-                        redirectToOTPLoginPage(authenticatedUserFromContext, applicationTenantDomain,
+                        redirectToOTPLoginPage(null, authenticatedUserFromContext, applicationTenantDomain,
                                 isInitialFederationAttempt, response, request, context);
                     } else {
                         String queryParams = FrameworkUtils.getQueryStringWithFrameworkContextId(
@@ -328,7 +341,7 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
             }
             publishPostOTPGeneratedEvent(otp, authenticatedUserFromContext, request, context);
         }
-        redirectToOTPLoginPage(authenticatedUserFromContext, applicationTenantDomain, isInitialFederationAttempt,
+        redirectToOTPLoginPage(mobile, authenticatedUserFromContext, applicationTenantDomain, isInitialFederationAttempt,
                 response, request, context);
     }
 
@@ -549,12 +562,43 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
         }
         // If the user is federated, we need to check whether the user is already provisioned to the organization.
         String federatedUsername = FederatedAuthenticatorUtil.getLoggedInFederatedUser(context);
+
+        if (isConfiguredIdpSubAssociationEnabled) {
+            for (int i = context.getSequenceConfig().getStepMap().size(); i > 0; --i) {
+                StepConfig stepConfig = (StepConfig) context.getSequenceConfig().getStepMap().get(i);
+
+                if (stepConfig.getAuthenticatedUser() != null
+                        && stepConfig.getAuthenticatedAutenticator() != null
+                        && stepConfig.getAuthenticatedAutenticator().getApplicationAuthenticator()
+                        instanceof FederatedApplicationAuthenticator) {
+                    try {
+                        federatedUsername =
+                                FrameworkUtils.getExternalSubject(stepConfig, context.getTenantDomain());
+                    } catch (PostAuthenticationFailedException e) {
+                        throw handleAuthErrorScenario(
+                                ERROR_CODE_INVALID_FEDERATED_AUTHENTICATOR,
+                                e,
+                                AuthenticatorUtils.maskIfRequired(federatedUsername)
+                        );
+                    }
+                }
+            }
+        }
+
         if (StringUtils.isBlank(federatedUsername)) {
             throw handleAuthErrorScenario(ERROR_CODE_NO_FEDERATED_USER);
         }
-        String associatedLocalUsername =
-                FederatedAuthenticatorUtil.getLocalUsernameAssociatedWithFederatedUser(MultitenantUtils.
-                        getTenantAwareUsername(federatedUsername), context);
+
+        String associatedLocalUsername;
+        if (isConfiguredIdpSubAssociationEnabled) {
+            associatedLocalUsername =
+                    FederatedAuthenticatorUtil.getLocalUsernameAssociatedWithFederatedUser(federatedUsername, context);
+        } else {
+            associatedLocalUsername =
+                    FederatedAuthenticatorUtil.getLocalUsernameAssociatedWithFederatedUser(MultitenantUtils.
+                            getTenantAwareUsername(federatedUsername), context);
+        }
+
         if (StringUtils.isNotBlank(associatedLocalUsername)) {
             return associatedLocalUsername;
         }
@@ -727,7 +771,7 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
      * @param context       AuthenticationContext.
      * @throws AuthenticationFailedException If an error occurred while redirecting to otp login page.
      */
-    protected void redirectToOTPLoginPage(AuthenticatedUser authenticatedUser, String tenantDomain,
+    protected void redirectToOTPLoginPage(String mobile, AuthenticatedUser authenticatedUser, String tenantDomain,
                                           boolean isInitialFederationAttempt, HttpServletResponse response,
                                           HttpServletRequest request, AuthenticationContext context)
             throws AuthenticationFailedException {
@@ -742,13 +786,18 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
                 .append(USERNAME_PARAM).append(username)
                 .append(multiOptionURI);
 
+        String maskedUserClaimValue = null;
         if (!isOTPAsFirstFactor(context)) {
-            String maskedUserClaimValue = getMaskedUserClaimValue(authenticatedUser, tenantDomain,
-                    isInitialFederationAttempt, context);
+            if (mobile == null) {
+                maskedUserClaimValue = getMaskedUserClaimValue(authenticatedUser, tenantDomain,
+                        isInitialFederationAttempt, context);
+            } else {
+                maskedUserClaimValue = getMaskedMobile(mobile);
+            }
+
             if (!StringUtils.isBlank(maskedUserClaimValue)) {
                 String screenValueQueryParam = SCREEN_VALUE_QUERY_PARAM
-                        + getMaskedUserClaimValue(authenticatedUser, tenantDomain,
-                        isInitialFederationAttempt, context);
+                        + maskedUserClaimValue;
                 queryParamsBuilder.append(screenValueQueryParam);
             }
         }
@@ -1349,7 +1398,7 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
 
     protected abstract String getAuthenticatorErrorPrefix();
 
-    protected abstract void sendOtp(AuthenticatedUser authenticatedUser, OTP otp, boolean isInitialFederationAttempt,
+    protected abstract void sendOtp(String mobile, AuthenticatedUser authenticatedUser, OTP otp, boolean isInitialFederationAttempt,
                                     HttpServletRequest request, HttpServletResponse response,
                                     AuthenticationContext context)
             throws AuthenticationFailedException;
@@ -1379,5 +1428,19 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
     protected  boolean isShowAuthFailureReason() {
 
         return false;
+    }
+
+    private String getMaskedMobile(String mobile) {
+
+        if (StringUtils.isBlank(mobile)) {
+            return null;
+        }
+        int screenAttributeLength = mobile.length();
+        String screenValue = mobile.substring(screenAttributeLength - 4,
+                screenAttributeLength);
+        String hiddenScreenValue = mobile.substring(0, screenAttributeLength - 4);
+        screenValue = new String(new char[hiddenScreenValue.length()]).
+                replace("\0", "*").concat(screenValue);
+        return screenValue;
     }
 }
