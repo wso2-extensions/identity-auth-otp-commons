@@ -19,6 +19,7 @@
 package org.wso2.carbon.identity.auth.otp.core;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.math.NumberUtils;
 import org.apache.commons.logging.Log;
@@ -37,8 +38,11 @@ import org.wso2.carbon.identity.application.authentication.framework.exception.L
 import org.wso2.carbon.identity.application.authentication.framework.exception.PostAuthenticationFailedException;
 import org.wso2.carbon.identity.application.authentication.framework.model.AuthenticatedIdPData;
 import org.wso2.carbon.identity.application.authentication.framework.model.AuthenticatedUser;
+import org.wso2.carbon.identity.application.authentication.framework.model.AuthenticatorMessage;
 import org.wso2.carbon.identity.application.authentication.framework.util.FrameworkConstants;
 import org.wso2.carbon.identity.application.authentication.framework.util.FrameworkUtils;
+import org.wso2.carbon.identity.application.common.model.ClaimConfig;
+import org.wso2.carbon.identity.application.common.model.ClaimMapping;
 import org.wso2.carbon.identity.application.common.model.IdentityProvider;
 import org.wso2.carbon.identity.application.common.model.JustInTimeProvisioningConfig;
 import org.wso2.carbon.identity.application.common.model.Property;
@@ -98,6 +102,7 @@ import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConst
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.ErrorMessages.ERROR_CODE_EMPTY_USERNAME;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.ErrorMessages.ERROR_CODE_ERROR_GETTING_ACCOUNT_UNLOCK_TIME;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.ErrorMessages.ERROR_CODE_ERROR_GETTING_FEDERATED_AUTHENTICATOR;
+import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.ErrorMessages.ERROR_CODE_ERROR_GETTING_MOBILE_NUMBER;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.ErrorMessages.ERROR_CODE_ERROR_GETTING_USER_CLAIM;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.ErrorMessages.ERROR_CODE_ERROR_GETTING_USER_REALM;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.ErrorMessages.ERROR_CODE_ERROR_GETTING_USER_STORE_MANAGER;
@@ -279,10 +284,9 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
         AuthenticatorConstants.AuthenticationScenarios scenario = resolveScenario(request, context);
 
         String mobile = null;
-        if (isConfiguredIdpSubAssociationEnabled) {
-            mobile = getUserClaimValueFromUserStore("http://wso2.org/claims/mobile",
-                    authenticatingUser, ERROR_CODE_ERROR_GETTING_USER_CLAIM);
-        }
+        mobile = resolveMobileNoOfAuthenticatedUser(authenticatingUser,
+                authenticatingUser.getTenantDomain(), context,
+                isInitialFederationAttempt);
 
         if (scenario == INITIAL_OTP || scenario == RESEND_OTP) {
             if (scenario == RESEND_OTP && context.getProperty(OTP_RESEND_ATTEMPTS) != null) {
@@ -302,7 +306,7 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
              * to triggered against the context user.
              */
             try {
-                sendOtp(mobile, authenticatingUser, otp, isInitialFederationAttempt, request, response, context);
+                sendOtp(mobile, authenticatedUserFromContext, otp, isInitialFederationAttempt, request, response, context);
                 LOG.debug("OTP code was sent successfully.");
             } catch (AuthenticationFailedException exception) {
                 String errorGettingUserClaimErrorCode = getAuthenticatorErrorPrefix() + "-"
@@ -1442,5 +1446,102 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
         screenValue = new String(new char[hiddenScreenValue.length()]).
                 replace("\0", "*").concat(screenValue);
         return screenValue;
+    }
+
+    private String resolveMobileNoOfAuthenticatedUser(AuthenticatedUser user, String tenantDomain,
+                                                      AuthenticationContext context, boolean isInitialFederationAttempt)
+            throws AuthenticationFailedException {
+
+        String mobile;
+        if (isInitialFederationAttempt) {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug(String.format("Getting the mobile number of the initially federating user: %s",
+                        user.getUserName()));
+            }
+            mobile = getMobileNoForFederatedUser(user, tenantDomain, context);
+        } else {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug(String.format("Getting the mobile number of the local user: %s in user store: %s in " +
+                        "tenant: %s", user.getUserName(), user.getUserStoreDomain(), user.getTenantDomain()));
+            }
+            String claimUri = "http://wso2.org/claims/mobile";
+            mobile = getUserClaimValueFromUserStore(claimUri, user, ERROR_CODE_ERROR_GETTING_MOBILE_NUMBER);
+        }
+        return mobile;
+    }
+
+    private String getMobileNoForFederatedUser(AuthenticatedUser user, String tenantDomain,
+                                               AuthenticationContext context) throws AuthenticationFailedException {
+
+        String mobileAttributeKey = resolveMobileNoAttribute(user, tenantDomain, context);
+        Map<ClaimMapping, String> userAttributes = user.getUserAttributes();
+        String mobile = null;
+        for (Map.Entry<ClaimMapping, String> entry : userAttributes.entrySet()) {
+            String key = String.valueOf(entry.getKey().getLocalClaim().getClaimUri());
+            if (key.equals(mobileAttributeKey)) {
+                String value = entry.getValue();
+                mobile = String.valueOf(value);
+                break;
+            }
+        }
+        return mobile;
+    }
+
+    private String resolveMobileNoAttribute(AuthenticatedUser user, String tenantDomain,
+                                            AuthenticationContext context) throws AuthenticationFailedException {
+
+        // Prioritizing the authenticator's dialect first, then considering the claim mapping defined in the IdP.
+        String dialect = getFederatedAuthenticatorDialect(context);
+        if ("http://wso2.org/oidc/claim".equals(dialect)) {
+            return "phone_number";
+        }
+        if ("http://wso2.org/claims".equals(dialect)) {
+            return "http://wso2.org/claims/mobile";
+        }
+        // If the dialect is not OIDC we need to check claim mappings for the mobile claim mapped attribute.
+        String idpName = user.getFederatedIdPName();
+        IdentityProvider idp = getIdentityProvider(idpName, tenantDomain);
+        ClaimConfig claimConfigs = idp.getClaimConfig();
+        if (claimConfigs == null) {
+            throw handleAuthErrorScenario(AuthenticatorConstants.ErrorMessages
+                    .ERROR_CODE_NO_CLAIM_CONFIGS_IN_FEDERATED_AUTHENTICATOR, idpName, tenantDomain);
+        }
+        ClaimMapping[] claimMappings = claimConfigs.getClaimMappings();
+        if (ArrayUtils.isEmpty(claimMappings)) {
+            throw handleAuthErrorScenario(AuthenticatorConstants.ErrorMessages
+                    .ERROR_CODE_NO_CLAIM_CONFIGS_IN_FEDERATED_AUTHENTICATOR, idpName, tenantDomain);
+        }
+
+        String mobileAttributeKey = null;
+        for (ClaimMapping claimMapping : claimMappings) {
+            if ("http://wso2.org/claims/mobile".equals(claimMapping.getLocalClaim().getClaimUri())) {
+                mobileAttributeKey = claimMapping.getRemoteClaim().getClaimUri();
+                break;
+            }
+        }
+        if (StringUtils.isBlank(mobileAttributeKey)) {
+            AuthenticatorMessage authenticatorMessage =
+                    new AuthenticatorMessage(FrameworkConstants.AuthenticatorMessageType.ERROR,
+                            AuthenticatorConstants.ErrorMessages.ERROR_CODE_NO_MOBILE_CLAIM_MAPPINGS.getCode(),
+                            AuthenticatorConstants.ErrorMessages.ERROR_CODE_NO_MOBILE_CLAIM_MAPPINGS.getMessage(),
+                            null);
+            context.setProperty("authenticatorMessage", authenticatorMessage);
+            throw handleAuthErrorScenario(AuthenticatorConstants.ErrorMessages.ERROR_CODE_NO_MOBILE_CLAIM_MAPPINGS,
+                    idpName, tenantDomain);
+        }
+        return mobileAttributeKey;
+    }
+
+    private String getFederatedAuthenticatorDialect(AuthenticationContext context) {
+
+        String dialect = null;
+        Map<Integer, StepConfig> stepConfigMap = context.getSequenceConfig().getStepMap();
+        for (StepConfig stepConfig : stepConfigMap.values()) {
+            if (stepConfig.isSubjectAttributeStep()) {
+                dialect = stepConfig.getAuthenticatedAutenticator().getApplicationAuthenticator().getClaimDialectURI();
+                break;
+            }
+        }
+        return dialect;
     }
 }
