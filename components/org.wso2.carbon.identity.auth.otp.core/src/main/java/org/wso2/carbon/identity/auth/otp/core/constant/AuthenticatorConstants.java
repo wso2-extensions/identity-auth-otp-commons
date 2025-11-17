@@ -134,7 +134,13 @@ public class AuthenticatorConstants {
         ERROR_CODE_ERROR_REDIRECTING_TO_IDF_PAGE("65029", "Error while redirecting to the login page."),
         ERROR_CODE_ERROR_GETTING_USER_CLAIM("65030",
                 "Error occurred while getting the claim %s for user: %s"),
-        ERROR_CODE_NO_MOBILE_NUMBER_FOUND("65031", "No mobile number found for user: %s");
+        ERROR_CODE_NO_MOBILE_NUMBER_FOUND("65031", "No mobile number found for user: %s"),
+        ERROR_CODE_ERROR_UPDATING_USER_CLAIMS("65032",
+                "Error occurred while updating the claims for user: %s"),
+        ERROR_CODE_ERROR_GETTING_LAST_RESEND_TIME("65033",
+                "Error occurred while getting last resend time for user: %s"),
+        ERROR_CODE_ERROR_GETTING_OTP_RESEND_ATTEMPTS("65034",
+                "Error occurred while getting OTP resend attempts for user: %s");
 
         private final String code;
         private final String message;
