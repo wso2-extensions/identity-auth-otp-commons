@@ -189,12 +189,12 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
     }
 
     /**
-     * Check whether user based SMS resend blocking is enabled.
+     * Check whether user based OTP resend blocking is enabled.
      *
      * @return true if enabled, false otherwise.
      * @throws AuthenticationFailedException If an error occurs while checking the configuration.
      */
-    protected boolean isUserBasedSMSResendBlockingEnabled() throws AuthenticationFailedException {
+    protected boolean isUserBasedOTPResendBlockingEnabled() throws AuthenticationFailedException {
 
         return false;
     }
@@ -309,16 +309,18 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
             throw new AuthenticationFailedException(ERROR_CODE_GETTING_ACCOUNT_STATE.getCode(), error, e);
         }
         AuthenticatorConstants.AuthenticationScenarios scenario = resolveScenario(request, context);
+        OTPResendClaims otpResendClaims = null;
+        int otpResendCount = 0;
+        boolean shouldUpdateUserClaim = false;
         if (scenario == INITIAL_OTP || scenario == RESEND_OTP) {
             int allowedResendAttemptsCount = getMaximumResendAttempts(applicationTenantDomain);
-            if (isUserBasedSMSResendBlockingEnabled()) {
-                OTPResendClaims claims = getOTPResendClaims();
+            if (isUserBasedOTPResendBlockingEnabled()) {
+                otpResendClaims = getOTPResendClaims();
 
                 // Get user-specific resend attempt count
-                int otpResendCount = 0;
                 String userResendCountStr =
                         getUserClaimValueFromUserStore(
-                                claims.getResendAttemptClaimUri(),
+                                otpResendClaims.getResendAttemptClaimUri(),
                                 authenticatedUserFromContext,
                                 ERROR_CODE_ERROR_GETTING_OTP_RESEND_ATTEMPTS);
                 if (StringUtils.isNotBlank(userResendCountStr)) {
@@ -327,7 +329,7 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
 
                 // Get last successful resend timestamp (if any)
                 String lastResendTimestamp = getUserClaimValueFromUserStore(
-                        claims.getLastResendTimeClaimUri(),
+                        otpResendClaims.getLastResendTimeClaimUri(),
                         authenticatedUserFromContext,
                         ERROR_CODE_ERROR_GETTING_LAST_RESEND_TIME);
                 if (otpResendCount >= allowedResendAttemptsCount) {
@@ -343,15 +345,14 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
                             handleOTPResendCountExceededScenario(request, response, context);
                             return;
                         } else {
-                            Map<String, String> claimMap = new HashMap<>();
-                            claimMap.put(claims.getResendAttemptClaimUri(),
-                                    String.valueOf(0));
-                            claimMap.put(claims.getLastResendTimeClaimUri(),
-                                    String.valueOf(System.currentTimeMillis()));
-                            setUserClaimValueFromUserStore(claimMap, authenticatedUserFromContext,
-                                    ERROR_CODE_ERROR_UPDATING_USER_CLAIMS);
+                            otpResendCount = 0;
+                            shouldUpdateUserClaim = true;
                         }
                     }
+                }
+                if (scenario == RESEND_OTP) {
+                    otpResendCount++;
+                    shouldUpdateUserClaim = true;
                 }
             } else {
                 if (scenario == RESEND_OTP && context.getProperty(OTP_RESEND_ATTEMPTS) != null) {
@@ -405,29 +406,20 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
                 }
             }
 
-            if (scenario == RESEND_OTP) {
-                if (isUserBasedSMSResendBlockingEnabled()) {
-                    OTPResendClaims claims = getOTPResendClaims();
-                    // Get user-specific resend attempt count
-                    int otpResendCount = 0;
-                    String userResendCountStr =
-                            getUserClaimValueFromUserStore(
-                                    claims.getResendAttemptClaimUri(),
-                                    authenticatedUserFromContext,
-                                    ERROR_CODE_ERROR_GETTING_OTP_RESEND_ATTEMPTS);
-                    if (StringUtils.isNotBlank(userResendCountStr)) {
-                        otpResendCount = Integer.parseInt(userResendCountStr);
-                    }
+            if (isUserBasedOTPResendBlockingEnabled()) {
+                if (shouldUpdateUserClaim) {
                     Map<String, String> claimMap = new HashMap<>();
-                    claimMap.put(claims.getResendAttemptClaimUri(), String.valueOf((otpResendCount + 1)));
-                    claimMap.put(claims.getLastResendTimeClaimUri(),
+                    claimMap.put(otpResendClaims.getResendAttemptClaimUri(), String.valueOf((otpResendCount)));
+                    claimMap.put(otpResendClaims.getLastResendTimeClaimUri(),
                             String.valueOf(System.currentTimeMillis()));
-                    setUserClaimValueFromUserStore(claimMap, authenticatedUserFromContext,
-                            ERROR_CODE_ERROR_UPDATING_USER_CLAIMS);
-                } else {
+                    setUserClaimValueFromUserStore(claimMap, authenticatedUserFromContext);
+                }
+            } else {
+                if (scenario == RESEND_OTP) {
                     updateResendCount(context);
                 }
             }
+
             publishPostOTPGeneratedEvent(otp, authenticatedUserFromContext, request, context);
         }
         redirectToOTPLoginPage(authenticatedUserFromContext, applicationTenantDomain, isInitialFederationAttempt,
@@ -588,11 +580,9 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
      *
      * @param userClaims        Map of claim uri and values.
      * @param authenticatedUser AuthenticatedUser.
-     * @param error             Error associated with the claim retrieval.
      * @throws AuthenticationFailedException If an error occurred while getting the claim value.
      */
-    protected void setUserClaimValueFromUserStore(Map<String, String> userClaims, AuthenticatedUser authenticatedUser,
-                                                  AuthenticatorConstants.ErrorMessages error)
+    protected void setUserClaimValueFromUserStore(Map<String, String> userClaims, AuthenticatedUser authenticatedUser)
             throws AuthenticationFailedException {
 
         UserStoreManager userStoreManager = getUserStoreManager(authenticatedUser);
@@ -600,7 +590,8 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
             userStoreManager.setUserClaimValues(MultitenantUtils.getTenantAwareUsername(
                     authenticatedUser.toFullQualifiedUsername()), userClaims, null);
         } catch (UserStoreException e) {
-            throw handleAuthErrorScenario(error, e, AuthenticatorUtils.maskIfRequired(authenticatedUser.getUserName()));
+            throw handleAuthErrorScenario(ERROR_CODE_ERROR_UPDATING_USER_CLAIMS, e,
+                    AuthenticatorUtils.maskIfRequired(authenticatedUser.getUserName()));
         }
     }
 
