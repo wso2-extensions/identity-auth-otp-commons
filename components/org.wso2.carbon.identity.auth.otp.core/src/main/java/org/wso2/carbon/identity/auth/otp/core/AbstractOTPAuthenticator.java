@@ -19,6 +19,7 @@
 package org.wso2.carbon.identity.auth.otp.core;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.apache.commons.lang.NotImplementedException;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.math.NumberUtils;
 import org.apache.commons.logging.Log;
@@ -42,6 +43,7 @@ import org.wso2.carbon.identity.application.common.model.Property;
 import org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants;
 import org.wso2.carbon.identity.auth.otp.core.internal.AuthenticatorDataHolder;
 import org.wso2.carbon.identity.auth.otp.core.model.OTP;
+import org.wso2.carbon.identity.auth.otp.core.model.OTPResendClaims;
 import org.wso2.carbon.identity.auth.otp.core.util.AuthenticatorUtils;
 import org.wso2.carbon.identity.captcha.connector.recaptcha.SSOLoginReCaptchaConfig;
 import org.wso2.carbon.identity.captcha.util.CaptchaConstants;
@@ -95,6 +97,8 @@ import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConst
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.ErrorMessages.ERROR_CODE_EMPTY_USERNAME;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.ErrorMessages.ERROR_CODE_ERROR_GETTING_ACCOUNT_UNLOCK_TIME;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.ErrorMessages.ERROR_CODE_ERROR_GETTING_FEDERATED_AUTHENTICATOR;
+import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.ErrorMessages.ERROR_CODE_ERROR_GETTING_LAST_RESEND_TIME;
+import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.ErrorMessages.ERROR_CODE_ERROR_GETTING_OTP_RESEND_ATTEMPTS;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.ErrorMessages.ERROR_CODE_ERROR_GETTING_USER_CLAIM;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.ErrorMessages.ERROR_CODE_ERROR_GETTING_USER_REALM;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.ErrorMessages.ERROR_CODE_ERROR_GETTING_USER_STORE_MANAGER;
@@ -102,6 +106,7 @@ import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConst
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.ErrorMessages.ERROR_CODE_ERROR_REDIRECTING_TO_IDF_PAGE;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.ErrorMessages.ERROR_CODE_ERROR_REDIRECTING_TO_LOGIN_PAGE;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.ErrorMessages.ERROR_CODE_ERROR_TRIGGERING_EVENT;
+import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.ErrorMessages.ERROR_CODE_ERROR_UPDATING_USER_CLAIMS;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.ErrorMessages.ERROR_CODE_GETTING_ACCOUNT_STATE;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.ErrorMessages.ERROR_CODE_INVALID_FEDERATED_AUTHENTICATOR;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.ErrorMessages.ERROR_CODE_NO_FEDERATED_USER;
@@ -159,6 +164,39 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
                 // Resend OTP and Submit OTP processing will be handled from here.
                 return super.process(request, response, context);
         }
+    }
+
+    /**
+     * Get OTP resend related identity claims.
+     *
+     * @return OTPResendClaims object containing the claim URIs.
+     */
+    protected OTPResendClaims getOTPResendClaims() {
+
+        throw new NotImplementedException("User based OTP resend blocking is not supported.");
+    }
+
+    /**
+     * Get OTP resend block duration in minutes.
+     *
+     * @param tenantDomain Tenant domain.
+     * @return Block duration in minutes.
+     * @throws AuthenticationFailedException If an error occurs while getting the block duration.
+     */
+    protected int getOTPResendBlockDuration(String tenantDomain) throws AuthenticationFailedException {
+
+        throw new NotImplementedException("User based OTP resend blocking is not supported.");
+    }
+
+    /**
+     * Check whether user based OTP resend blocking is enabled.
+     *
+     * @return true if enabled, false otherwise.
+     * @throws AuthenticationFailedException If an error occurs while checking the configuration.
+     */
+    protected boolean isUserBasedOTPResendBlockingEnabled() throws AuthenticationFailedException {
+
+        return false;
     }
 
     @Override
@@ -271,13 +309,58 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
             throw new AuthenticationFailedException(ERROR_CODE_GETTING_ACCOUNT_STATE.getCode(), error, e);
         }
         AuthenticatorConstants.AuthenticationScenarios scenario = resolveScenario(request, context);
+        OTPResendClaims otpResendClaims = null;
+        int otpResendCount = 0;
+        boolean shouldUpdateUserClaim = false;
         if (scenario == INITIAL_OTP || scenario == RESEND_OTP) {
-            if (scenario == RESEND_OTP && context.getProperty(OTP_RESEND_ATTEMPTS) != null) {
-                if (!StringUtils.isBlank(context.getProperty(OTP_RESEND_ATTEMPTS).toString())) {
-                    int allowedResendAttemptsCount = getMaximumResendAttempts(applicationTenantDomain);
-                    if ((int) context.getProperty(OTP_RESEND_ATTEMPTS) >= allowedResendAttemptsCount) {
-                        handleOTPResendCountExceededScenario(request, response, context);
-                        return;
+            int allowedResendAttemptsCount = getMaximumResendAttempts(applicationTenantDomain);
+            if (isUserBasedOTPResendBlockingEnabled()) {
+                otpResendClaims = getOTPResendClaims();
+
+                // Get user-specific resend attempt count
+                String userResendCountStr =
+                        getUserClaimValueFromUserStore(
+                                otpResendClaims.getResendAttemptClaimUri(),
+                                authenticatedUserFromContext,
+                                ERROR_CODE_ERROR_GETTING_OTP_RESEND_ATTEMPTS);
+                if (StringUtils.isNotBlank(userResendCountStr)) {
+                    otpResendCount = Integer.parseInt(userResendCountStr);
+                }
+
+                // Get last successful resend timestamp (if any)
+                String lastResendTimestamp = getUserClaimValueFromUserStore(
+                        otpResendClaims.getLastResendTimeClaimUri(),
+                        authenticatedUserFromContext,
+                        ERROR_CODE_ERROR_GETTING_LAST_RESEND_TIME);
+                if (otpResendCount >= allowedResendAttemptsCount) {
+                    // Convert block time (minutes) to milliseconds
+                    int otpResendBlockTimeMinutes = getOTPResendBlockDuration(applicationTenantDomain);
+                    if (StringUtils.isNotBlank(lastResendTimestamp)) {
+                        long lastResend = Long.parseLong(lastResendTimestamp);
+                        long now = System.currentTimeMillis();
+                        long blockTimeMillis = otpResendBlockTimeMinutes * 60_000L; // MINUTES → MILLIS
+                        boolean withinBlockWindow = (now - lastResend) < blockTimeMillis;
+
+                        if (withinBlockWindow) {
+                            handleOTPResendCountExceededScenario(request, response, context);
+                            return;
+                        } else {
+                            otpResendCount = 0;
+                            shouldUpdateUserClaim = true;
+                        }
+                    }
+                }
+                if (scenario == RESEND_OTP) {
+                    otpResendCount++;
+                    shouldUpdateUserClaim = true;
+                }
+            } else {
+                if (scenario == RESEND_OTP && context.getProperty(OTP_RESEND_ATTEMPTS) != null) {
+                    if (!StringUtils.isBlank(context.getProperty(OTP_RESEND_ATTEMPTS).toString())) {
+                        if ((int) context.getProperty(OTP_RESEND_ATTEMPTS) >= allowedResendAttemptsCount) {
+                            handleOTPResendCountExceededScenario(request, response, context);
+                            return;
+                        }
                     }
                 }
             }
@@ -323,9 +406,20 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
                 }
             }
 
-            if (scenario == RESEND_OTP) {
-                updateResendCount(context);
+            if (isUserBasedOTPResendBlockingEnabled()) {
+                if (shouldUpdateUserClaim) {
+                    Map<String, String> claimMap = new HashMap<>();
+                    claimMap.put(otpResendClaims.getResendAttemptClaimUri(), String.valueOf((otpResendCount)));
+                    claimMap.put(otpResendClaims.getLastResendTimeClaimUri(),
+                            String.valueOf(System.currentTimeMillis()));
+                    setUserClaimValueFromUserStore(claimMap, authenticatedUserFromContext);
+                }
+            } else {
+                if (scenario == RESEND_OTP) {
+                    updateResendCount(context);
+                }
             }
+
             publishPostOTPGeneratedEvent(otp, authenticatedUserFromContext, request, context);
         }
         redirectToOTPLoginPage(authenticatedUserFromContext, applicationTenantDomain, isInitialFederationAttempt,
@@ -478,6 +572,26 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
             return claimValues.get(claimUri);
         } catch (UserStoreException e) {
             throw handleAuthErrorScenario(error, e, AuthenticatorUtils.maskIfRequired(authenticatedUser.getUserName()));
+        }
+    }
+
+    /**
+     * Get user claim value.
+     *
+     * @param userClaims        Map of claim uri and values.
+     * @param authenticatedUser AuthenticatedUser.
+     * @throws AuthenticationFailedException If an error occurred while getting the claim value.
+     */
+    protected void setUserClaimValueFromUserStore(Map<String, String> userClaims, AuthenticatedUser authenticatedUser)
+            throws AuthenticationFailedException {
+
+        UserStoreManager userStoreManager = getUserStoreManager(authenticatedUser);
+        try {
+            userStoreManager.setUserClaimValues(MultitenantUtils.getTenantAwareUsername(
+                    authenticatedUser.toFullQualifiedUsername()), userClaims, null);
+        } catch (UserStoreException e) {
+            throw handleAuthErrorScenario(ERROR_CODE_ERROR_UPDATING_USER_CLAIMS, e,
+                    AuthenticatorUtils.maskIfRequired(authenticatedUser.getUserName()));
         }
     }
 
