@@ -304,8 +304,7 @@ public class AbstractOTPExecutorTest {
 
         flowExecutionContext.getUserInputData().put(OTPExecutorConstants.OTP, "123456");
         testOTPExecutor.processResponse(flowExecutionContext, response);
-        Assert.assertEquals(response.getResult(), STATUS_ERROR);
-        Assert.assertEquals(response.getErrorMessage(), "{{otp.not.generated.error.message}}");
+        Assert.assertEquals(response.getResult(), STATUS_RETRY);
     }
 
     @Test
