@@ -86,7 +86,11 @@ public abstract class AbstractOTPExecutor extends AuthenticationExecutor {
                 }
             } else {
                 if (isResendRequest(flowExecutionContext)) {
-                    handleResend(flowExecutionContext, response);
+                    if (validateInitiation(flowExecutionContext)) {
+                        handleResend(flowExecutionContext, response);
+                    } else {
+                        response.setResult(STATUS_USER_INPUT_REQUIRED);
+                    }
                     return response;
                 }
                 processResponse(flowExecutionContext, response);
@@ -213,15 +217,19 @@ public abstract class AbstractOTPExecutor extends AuthenticationExecutor {
             }
     }
 
-    private static OTP getOTPFromContext(FlowExecutionContext flowExecutionContext, ExecutorResponse response) {
+    private OTP getOTPFromContext(FlowExecutionContext flowExecutionContext, ExecutorResponse response) {
 
         Object value = flowExecutionContext.getProperty(OTP);
         HashMap<String, Object> contextOTP = OBJECT_MAPPER.convertValue(value,
                 new TypeReference<HashMap<String, Object>>() {
                 });
         if (contextOTP == null) {
-            response.setResult(Constants.ExecutorStatus.STATUS_ERROR);
-            response.setErrorMessage("{{otp.not.generated.error.message}}");
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("OTP not found in the context properties.");
+            }
+            logDiagnostic("OTP not found in the context properties.",
+                    DiagnosticLog.ResultStatus.FAILED, SEND_OTP);
+            response.setResult(STATUS_RETRY);
             return null;
         }
 
@@ -357,8 +365,15 @@ public abstract class AbstractOTPExecutor extends AuthenticationExecutor {
             return;
         }
         OTP otp = generateOTP(context.getTenantDomain());
-        Map<String, Object> contextProperties = response.getContextProperties();
+        if (otp == null) {
+            logDiagnostic("Generated OTP is null in " + getName(),
+                    DiagnosticLog.ResultStatus.FAILED, SEND_OTP);
+            throw handleAuthErrorScenario(
+                    new FlowEngineException("Generated OTP is null."),
+                    "Generated OTP is null in " + getName() + ".");
+        }
 
+        Map<String, Object> contextProperties = response.getContextProperties();
         HashMap<String, Object> otpData = new HashMap<>();
         otpData.put(OTPExecutorConstants.OTPData.VALUE, otp.getValue());
         otpData.put(OTPExecutorConstants.OTPData.GENERATED_TIME_IN_MILLIS, otp.getGeneratedTimeInMillis());
