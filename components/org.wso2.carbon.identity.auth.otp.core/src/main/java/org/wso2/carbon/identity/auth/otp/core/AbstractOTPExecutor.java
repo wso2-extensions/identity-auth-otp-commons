@@ -86,7 +86,11 @@ public abstract class AbstractOTPExecutor extends AuthenticationExecutor {
                 }
             } else {
                 if (isResendRequest(flowExecutionContext)) {
-                    handleResend(flowExecutionContext, response);
+                    if (validateInitiation(flowExecutionContext)) {
+                        handleResend(flowExecutionContext, response);
+                    } else {
+                        response.setResult(STATUS_USER_INPUT_REQUIRED);
+                    }
                     return response;
                 }
                 processResponse(flowExecutionContext, response);
