@@ -362,7 +362,7 @@ public abstract class AbstractOTPExecutor extends AuthenticationExecutor {
         }
         OTP otp = generateOTP(context.getTenantDomain());
         if (otp == null) {
-            logDiagnostic("Generated OTP is null in" + getName(),
+            logDiagnostic("Generated OTP is null in " + getName(),
                     DiagnosticLog.ResultStatus.FAILED, SEND_OTP);
             throw handleAuthErrorScenario(
                     new FlowEngineException("Generated OTP is null."),
