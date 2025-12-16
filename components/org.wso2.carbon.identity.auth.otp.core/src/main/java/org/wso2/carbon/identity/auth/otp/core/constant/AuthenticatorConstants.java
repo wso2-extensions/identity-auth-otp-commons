@@ -140,7 +140,9 @@ public class AuthenticatorConstants {
         ERROR_CODE_ERROR_GETTING_LAST_RESEND_TIME("65033",
                 "Error occurred while getting last resend time for user: %s"),
         ERROR_CODE_ERROR_GETTING_OTP_RESEND_ATTEMPTS("65034",
-                "Error occurred while getting OTP resend attempts for user: %s");
+                "Error occurred while getting OTP resend attempts for user: %s"),
+        ERROR_CODE_ERROR_CHECKING_USER_EXISTENCE("65035",
+                "Error occurred while checking existence of user: %s");
 
         private final String code;
         private final String message;

@@ -95,6 +95,7 @@ import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConst
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.ERROR_USER_RESEND_COUNT_EXCEEDED_QUERY_PARAMS;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.ErrorMessages.ERROR_CODE_EMPTY_OTP_CODE;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.ErrorMessages.ERROR_CODE_EMPTY_USERNAME;
+import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.ErrorMessages.ERROR_CODE_ERROR_CHECKING_USER_EXISTENCE;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.ErrorMessages.ERROR_CODE_ERROR_GETTING_ACCOUNT_UNLOCK_TIME;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.ErrorMessages.ERROR_CODE_ERROR_GETTING_FEDERATED_AUTHENTICATOR;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.ErrorMessages.ERROR_CODE_ERROR_GETTING_LAST_RESEND_TIME;
@@ -312,16 +313,20 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
         OTPResendClaims otpResendClaims = null;
         int otpResendCount = 0;
         boolean shouldUpdateUserClaim = false;
+        AuthenticatedUser mappedLocalUser =
+                authenticatedUserFromContext.isFederatedUser() ? authenticatingUser :
+                        authenticatedUserFromContext;
+        boolean isUserExists = isUserExists(mappedLocalUser, context);
         if (scenario == INITIAL_OTP || scenario == RESEND_OTP) {
             int allowedResendAttemptsCount = getMaximumResendAttempts(applicationTenantDomain);
-            if (isUserBasedOTPResendBlockingEnabled()) {
+            if (isUserBasedOTPResendBlockingEnabled() && isUserExists) {
                 otpResendClaims = getOTPResendClaims();
 
                 // Get user-specific resend attempt count
                 String userResendCountStr =
                         getUserClaimValueFromUserStore(
                                 otpResendClaims.getResendAttemptClaimUri(),
-                                authenticatedUserFromContext,
+                                mappedLocalUser,
                                 ERROR_CODE_ERROR_GETTING_OTP_RESEND_ATTEMPTS);
                 if (StringUtils.isNotBlank(userResendCountStr)) {
                     otpResendCount = Integer.parseInt(userResendCountStr);
@@ -330,7 +335,7 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
                 // Get last successful resend timestamp (if any)
                 String lastResendTimestamp = getUserClaimValueFromUserStore(
                         otpResendClaims.getLastResendTimeClaimUri(),
-                        authenticatedUserFromContext,
+                        mappedLocalUser,
                         ERROR_CODE_ERROR_GETTING_LAST_RESEND_TIME);
                 if (otpResendCount >= allowedResendAttemptsCount) {
                     // Convert block time (minutes) to milliseconds
@@ -372,7 +377,7 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
              * to triggered against the context user.
              */
             try {
-                sendOtp(authenticatedUserFromContext, otp, isInitialFederationAttempt, request, response, context);
+                sendOtp(mappedLocalUser, otp, isInitialFederationAttempt, request, response, context);
                 LOG.debug("OTP code was sent successfully.");
             } catch (AuthenticationFailedException exception) {
                 String errorGettingUserClaimErrorCode = getAuthenticatorErrorPrefix() + "-"
@@ -412,7 +417,7 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
                     claimMap.put(otpResendClaims.getResendAttemptClaimUri(), String.valueOf((otpResendCount)));
                     claimMap.put(otpResendClaims.getLastResendTimeClaimUri(),
                             String.valueOf(System.currentTimeMillis()));
-                    setUserClaimValueFromUserStore(claimMap, authenticatedUserFromContext);
+                    setUserClaimValueFromUserStore(claimMap, mappedLocalUser);
                 }
             } else {
                 if (scenario == RESEND_OTP) {
@@ -422,7 +427,7 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
 
             publishPostOTPGeneratedEvent(otp, authenticatedUserFromContext, request, context);
         }
-        redirectToOTPLoginPage(authenticatedUserFromContext, applicationTenantDomain, isInitialFederationAttempt,
+        redirectToOTPLoginPage(mappedLocalUser, applicationTenantDomain, isInitialFederationAttempt,
                 response, request, context);
     }
 
@@ -504,6 +509,32 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
             throw handleAuthErrorScenario(ERROR_CODE_OTP_INVALID,
                     AuthenticatorUtils.maskIfRequired(authenticatedUserFromContext.getUserName()));
         }
+    }
+
+    /**
+     * Check whether the user exists in the user store.
+     *
+     * @param authenticatedUser Authenticated user.
+     * @param context          Authentication context.
+     * @return True if the user exists, false otherwise.
+     *
+     * @throws AuthenticationFailedException In case of an error while checking user existence.
+     */
+    private boolean isUserExists(AuthenticatedUser authenticatedUser, AuthenticationContext context)
+            throws AuthenticationFailedException {
+
+        if (authenticatedUser.isFederatedUser()) {
+            UserStoreManager userStoreManager = getUserStoreManager(authenticatedUser);
+            try {
+                return userStoreManager.isExistingUser(
+                        MultitenantUtils.getTenantAwareUsername(authenticatedUser.toFullQualifiedUsername()));
+            } catch (UserStoreException e) {
+                throw handleAuthErrorScenario(ERROR_CODE_ERROR_CHECKING_USER_EXISTENCE, e, context,
+                        org.wso2.carbon.identity.auth.otp.core.util.AuthenticatorUtils.maskIfRequired(
+                                authenticatedUser.getUserName()));
+            }
+        }
+        return true;
     }
 
     /**
