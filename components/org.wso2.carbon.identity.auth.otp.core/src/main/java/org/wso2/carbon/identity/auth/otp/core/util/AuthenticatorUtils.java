@@ -19,6 +19,8 @@
 package org.wso2.carbon.identity.auth.otp.core.util;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.owasp.encoder.Encode;
 import org.wso2.carbon.identity.application.authentication.framework.exception.AuthenticationFailedException;
 import org.wso2.carbon.identity.application.common.model.Property;
@@ -26,7 +28,13 @@ import org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants;
 import org.wso2.carbon.identity.auth.otp.core.internal.AuthenticatorDataHolder;
 import org.wso2.carbon.identity.central.log.mgt.utils.LoggerUtils;
 
+import org.wso2.carbon.utils.DiagnosticLog;
+
 import javax.servlet.http.HttpServletRequest;
+
+import java.util.Map;
+import java.util.Optional;
+import java.util.OptionalInt;
 
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.MULTI_OPTION_URI_PARAM;
 import static org.wso2.carbon.identity.handler.event.account.lock.constants.AccountConstants.ACCOUNT_UNLOCK_TIME_PROPERTY;
@@ -37,6 +45,9 @@ import static org.wso2.carbon.identity.handler.event.account.lock.constants.Acco
  * Utility functions for the authenticator.
  */
 public class AuthenticatorUtils {
+
+    private static final Log LOG = LogFactory.getLog(AuthenticatorUtils.class);
+    private static final String COMPONENT_ID = "auth-otp-core-authenticator-utils";
 
     /**
      * Get the multi option URI query param.
@@ -87,4 +98,103 @@ public class AuthenticatorUtils {
         }
         return connectorConfigs;
     }
+
+    /**
+     * Get the parameter value from the runtime parameters if available.
+     *
+     * @param runtimeParams Runtime parameters.
+     * @param paramName     Parameter name.
+     * @return Optional parameter value.
+     */
+    public static Optional<String> getOptionalParamFromRuntimeParams(Map<String, String> runtimeParams,
+                                                                     String paramName) {
+
+        if (runtimeParams == null || runtimeParams.isEmpty()) {
+            return Optional.empty();
+        }
+
+        String value = runtimeParams.get(paramName);
+        if (value != null) {
+            return Optional.of(value);
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * Get the boolean parameter value from the runtime parameters if available.
+     *
+     * @param runtimeParams Runtime parameters.
+     * @param paramName     Parameter name.
+     * @return Optional boolean parameter value.
+     */
+    public static Optional<Boolean> getOptionalBooleanParamFromRuntimeParams(Map<String, String> runtimeParams,
+                                                                             String paramName) {
+
+        Optional<String> paramValue = getOptionalParamFromRuntimeParams(runtimeParams, paramName);
+        if (paramValue.isPresent()) {
+            String value = paramValue.get();
+            return Optional.of(Boolean.parseBoolean(value));
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * Get the integer parameter value from the runtime parameters if available.
+     *
+     * @param runtimeParams Runtime parameters.
+     * @param paramName     Parameter name.
+     * @return Optional integer parameter value.
+     */
+    public static OptionalInt getOptionalIntParamFromRuntimeParams(Map<String, String> runtimeParams,
+                                                                   String paramName) {
+
+        if (runtimeParams == null || runtimeParams.isEmpty()) {
+            return OptionalInt.empty();
+        }
+
+        String value = runtimeParams.get(paramName);
+        if (value != null) {
+            try {
+                return OptionalInt.of(Integer.parseInt(value));
+            } catch (NumberFormatException e) {
+                logDiagnostic(
+                        COMPONENT_ID,
+                        AuthenticatorConstants.LogConstants.ActionID.GET_OPTIONAL_INTEGER_RUNTIME_PARAMS,
+                        "Unable to parse the parameter: " + paramName + " with value: "
+                                + value + " to an integer. Returning empty optional.",
+                        DiagnosticLog.ResultStatus.FAILED,
+                        DiagnosticLog.LogDetailLevel.APPLICATION
+                );
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Unable to parse the parameter: " + paramName + " with value: "
+                            + value + " to an integer.", e);
+                }
+            }
+        }
+        return OptionalInt.empty();
+    }
+
+    /**
+     * Trigger a diagnostic log event if diagnostic logging is enabled.
+     *
+     * @param componentId    The diagnostic log component ID.
+     * @param actionId       The action ID associated with the log event.
+     * @param message        The result message to include in the log.
+     * @param status         The result status of the operation.
+     * @param logDetailLevel The detail level of the log entry.
+     */
+    public static void logDiagnostic(String componentId, String actionId, String message,
+                                     DiagnosticLog.ResultStatus status,
+                                     DiagnosticLog.LogDetailLevel logDetailLevel) {
+
+        if (LoggerUtils.isDiagnosticLogsEnabled()) {
+            LoggerUtils.triggerDiagnosticLogEvent(
+                    new DiagnosticLog.DiagnosticLogBuilder(componentId, actionId)
+                            .resultMessage(message)
+                            .logDetailLevel(logDetailLevel)
+                            .resultStatus(status)
+            );
+        }
+    }
 }
+
