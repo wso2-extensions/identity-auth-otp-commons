@@ -69,7 +69,6 @@ public class AuthenticatorConstants {
     // Runtime Params.
     public static final String MAXIMUM_ALLOWED_FAILURE_LIMIT = "maximumAllowedFailureAttempts";
     public static final String MAXIMUM_RESEND_LIMIT = "maximumAllowedResendAttempts";
-    public static final String SKIP_RESEND_BLOCK_TIME = "skipResendBlockTime";
     public static final String TERMINATE_ON_RESEND_LIMIT_EXCEEDED = "terminateOnResendLimitExceeded";
 
 

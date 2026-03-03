@@ -44,7 +44,6 @@ import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConst
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.DEFAULT_OTP_RETRY_ATTEMPTS_CONTEXT_PROPERTY_NAME;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.MAXIMUM_ALLOWED_FAILURE_LIMIT;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.MAXIMUM_RESEND_LIMIT;
-import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.SKIP_RESEND_BLOCK_TIME;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.TERMINATE_ON_RESEND_LIMIT_EXCEEDED;
 
 /**
@@ -187,40 +186,6 @@ public class ContextBasedOTPControlTest {
 
         AuthenticationContext context = createContextWithRuntimeParams(null, null);
         Assert.assertFalse(authenticator.isTerminateOnResendLimitExceeded(context));
-    }
-
-    @Test(description = "User-based resend blocking is disabled when skipResendBlockTime runtime param is 'true'")
-    public void testIsUserBasedOTPResendBlockingEnabled_SkipResendBlockTimeTrue()
-            throws AuthenticationFailedException {
-
-        AuthenticationContext context = createContextWithRuntimeParams(
-                SKIP_RESEND_BLOCK_TIME, "true");
-
-        // skipResendBlockTimeParam.isPresent() && skipResendBlockTimeParam.get() == true
-        // => return !true => false
-        Assert.assertFalse(authenticator.isUserBasedOTPResendBlockingEnabled(context));
-    }
-
-    @Test(description = "User-based resend blocking is enabled when skipResendBlockTime runtime param is 'false'")
-    public void testIsUserBasedOTPResendBlockingEnabled_SkipResendBlockTimeFalse()
-            throws AuthenticationFailedException {
-
-        AuthenticationContext context = createContextWithRuntimeParams(
-                SKIP_RESEND_BLOCK_TIME, "false");
-
-        // skipResendBlockTimeParam.isPresent() && skipResendBlockTimeParam.get() == false, but the underlying
-        // AbstractOTPAuthenticator.isUserBasedOTPResendBlockingEnabled() returns false by default in this setup.
-        Assert.assertFalse(authenticator.isUserBasedOTPResendBlockingEnabled(context));
-    }
-
-    @Test(description = "User-based resend blocking falls back to default (false) when skipResendBlockTime is absent")
-    public void testIsUserBasedOTPResendBlockingEnabled_NoOverride()
-            throws AuthenticationFailedException {
-
-        AuthenticationContext context = createContextWithRuntimeParams(null, null);
-
-        // No override → falls back to isUserBasedOTPResendBlockingEnabled() which returns false by default
-        Assert.assertFalse(authenticator.isUserBasedOTPResendBlockingEnabled(context));
     }
 
     @Test(description = "updateContextOTPResendCount initialises the counter to 1 when not set")
@@ -682,11 +647,10 @@ public class ContextBasedOTPControlTest {
     public void testSkipResendBlockTimeOverridesUserBasedBlocking() throws AuthenticationFailedException {
 
         Map<String, String> params = new HashMap<>();
-        params.put(SKIP_RESEND_BLOCK_TIME, "true");
         params.put(MAXIMUM_RESEND_LIMIT, "3");
         AuthenticationContext context = createContextWithMultipleRuntimeParams(params);
         // User-based blocking is skipped
-        Assert.assertFalse(authenticator.isUserBasedOTPResendBlockingEnabled(context));
+        Assert.assertFalse(authenticator.isUserBasedOTPResendBlockingEnabled());
         // Context-based blocking is still enabled independently
         Assert.assertTrue(authenticator.isContextBasedOTPResendBlockingEnabled(context));
     }

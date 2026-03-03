@@ -139,7 +139,6 @@ import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConst
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.RESEND;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.RETRY_QUERY_PARAMS;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.SCREEN_VALUE_QUERY_PARAM;
-import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.SKIP_RESEND_BLOCK_TIME;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.TERMINATE_ON_RESEND_LIMIT_EXCEEDED;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.UNKNOWN_USER;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.UNLOCK_QUERY_PARAM;
@@ -198,27 +197,6 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
     protected int getOTPResendBlockDuration(String tenantDomain) throws AuthenticationFailedException {
 
         throw new NotImplementedException("User based OTP resend blocking is not supported.");
-    }
-
-    /**
-     * Check whether user based OTP resend blocking is enabled.
-     *
-     * @param context Authentication context.
-     * @return true if enabled, false otherwise.
-     * @throws AuthenticationFailedException If an error occurs while checking the configuration.
-     */
-    protected boolean isUserBasedOTPResendBlockingEnabled(AuthenticationContext context)
-            throws AuthenticationFailedException {
-
-        Optional<Boolean> skipResendBlockTimeParam =
-                AuthenticatorUtils.getOptionalBooleanParamFromRuntimeParams(getRuntimeParams(context),
-                        SKIP_RESEND_BLOCK_TIME);
-        if (skipResendBlockTimeParam.isPresent()) {
-            if (skipResendBlockTimeParam.get()) {
-                return false;
-            }
-        }
-        return isUserBasedOTPResendBlockingEnabled();
     }
 
     /**
@@ -451,7 +429,7 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
         boolean isUserExists = isUserExists(mappedLocalUser, context);
         if (scenario == INITIAL_OTP || scenario == RESEND_OTP) {
             int allowedResendAttemptsCountForUserBeforeBlock = getMaximumResendAttempts(applicationTenantDomain);
-            boolean isUserBasedOTPResendBlockingEnabled = isUserBasedOTPResendBlockingEnabled(context) && isUserExists;
+            boolean isUserBasedOTPResendBlockingEnabled = isUserBasedOTPResendBlockingEnabled() && isUserExists;
             if (isUserBasedOTPResendBlockingEnabled) {
                 otpResendClaims = getOTPResendClaims();
 
