@@ -120,8 +120,6 @@ public class AbstractOTPAuthenticatorTest {
      */
     private static class TestOTPAuthenticator extends AbstractOTPAuthenticator {
 
-        private Map<String, String> runtimeParams;
-
         @Override
         protected String getAuthenticatorErrorPrefix() {
 

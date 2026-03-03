@@ -208,8 +208,8 @@ public class ContextBasedOTPControlTest {
         AuthenticationContext context = createContextWithRuntimeParams(
                 SKIP_RESEND_BLOCK_TIME, "false");
 
-        // skipResendBlockTimeParam.isPresent() && skipResendBlockTimeParam.get() == false
-        // => return !false => true
+        // skipResendBlockTimeParam.isPresent() && skipResendBlockTimeParam.get() == false, but the underlying
+        // AbstractOTPAuthenticator.isUserBasedOTPResendBlockingEnabled() returns false by default in this setup.
         Assert.assertFalse(authenticator.isUserBasedOTPResendBlockingEnabled(context));
     }
 
@@ -628,8 +628,8 @@ public class ContextBasedOTPControlTest {
         context.setTenantDomain(TENANT_DOMAIN);
         int remaining = invokePrivateIntMethod(
                 "getRemainingNumberOfContextBasedRetryAttempts",
-                new Class[]{String.class, AuthenticationContext.class},
-                new Object[]{TENANT_DOMAIN, context});
+                new Class[]{AuthenticationContext.class},
+                new Object[]{context});
         Assert.assertEquals(remaining, 3);
     }
 
@@ -643,8 +643,8 @@ public class ContextBasedOTPControlTest {
         context.setTenantDomain(TENANT_DOMAIN);
         int remaining = invokePrivateIntMethod(
                 "getRemainingNumberOfContextBasedRetryAttempts",
-                new Class[]{String.class, AuthenticationContext.class},
-                new Object[]{TENANT_DOMAIN, context});
+                new Class[]{AuthenticationContext.class},
+                new Object[]{context});
         Assert.assertEquals(remaining, 0);
     }
 
@@ -658,8 +658,8 @@ public class ContextBasedOTPControlTest {
         context.setTenantDomain(TENANT_DOMAIN);
         int remaining = invokePrivateIntMethod(
                 "getRemainingNumberOfContextBasedRetryAttempts",
-                new Class[]{String.class, AuthenticationContext.class},
-                new Object[]{TENANT_DOMAIN, context});
+                new Class[]{AuthenticationContext.class},
+                new Object[]{context});
         Assert.assertEquals(remaining, 0);
     }
 

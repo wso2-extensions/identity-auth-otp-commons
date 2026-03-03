@@ -275,7 +275,7 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
             if (LOG.isDebugEnabled()) {
                 LOG.debug(
                         String.format("Invalid value: %d for maximum allowed retry attempts limit. " +
-                                "The value should be a non-negative integer.", retryLimit));
+                                "The value should be a positive integer.", retryLimit));
             }
             AuthenticatorUtils.logDiagnostic(getName(),
                     AuthenticatorConstants.LogConstants.ActionID.GET_MAX_FAILURE_LIMIT,
@@ -480,7 +480,7 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
                         boolean withinBlockWindow = (now - lastResend) < blockTimeMillis;
 
                         if (withinBlockWindow) {
-                            // If the user is withing the block window, do not terminate the flow immediately.
+                            // If the user is within the block window, do not terminate the flow immediately.
                             // Instead, redirect the user to the OTP login page with an error message indicating
                             // that the resend limit has been exceeded.
                             handleOTPResendCountExceededScenario(request, response, context, authenticatingUser, false);
@@ -1103,22 +1103,6 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
         redirectToErrorPage(request, response, context, queryParams, ERROR_USER_RESEND_COUNT_EXCEEDED_QUERY_PARAMS);
     }
 
-    /**
-     * Handle OTP resend attempt within block period scenarios.
-     *
-     * @param request  HttpServletRequest.
-     * @param response HttpServletResponse.
-     * @param context  AuthenticationContext.
-     * @param user   Authenticated user.
-     * @throws AuthenticationFailedException If an error occurred.
-     */
-    private void handleOTPResendAttemptWithinBlockWindow(HttpServletRequest request, HttpServletResponse response,
-                                                         AuthenticationContext context, AuthenticatedUser user)
-            throws AuthenticationFailedException {
-
-        handleOTPResendCountExceededScenario(request, response, context, user, false);
-    }
-
     protected AuthenticatorConstants.AuthenticationScenarios resolveScenario(HttpServletRequest request,
                                                                              AuthenticationContext context) {
 
@@ -1209,7 +1193,7 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
 
         if (isContextBasedRetryBlockingEnabled(context)) {
             return Math.min(getRemainingNumberOfOtpAttemptsForAccountLock(authenticatedUser, tenantDomain),
-                    getRemainingNumberOfContextBasedRetryAttempts(tenantDomain, context));
+                    getRemainingNumberOfContextBasedRetryAttempts(context));
         } else {
             return getRemainingNumberOfOtpAttemptsForAccountLock(authenticatedUser, tenantDomain);
         }
@@ -1218,13 +1202,12 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
     /**
      * Get the remaining number of context based retry attempts.
      *
-     * @param tenantDomain Tenant domain.
      * @param context Authentication context.
      * @return Remaining number of context based retry attempts.
      * @throws AuthenticationFailedException If an error occurred while getting the remaining number of
      *                                       context based retry attempts.
      */
-    private int getRemainingNumberOfContextBasedRetryAttempts(String tenantDomain, AuthenticationContext context)
+    private int getRemainingNumberOfContextBasedRetryAttempts(AuthenticationContext context)
             throws AuthenticationFailedException {
 
         int maxRetryAttempts = getMaximumRetryAttempts(context.getTenantDomain(), context);
