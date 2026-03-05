@@ -63,334 +63,223 @@ public class AuthenticatorUtilsTest {
         }
     }
 
-    @Test(description = "Returns the value when the param exists in the map")
-    public void testGetOptionalParam_WhenParamExists() {
+    @DataProvider(name = "getStringRuntimeParamByNameData")
+    public Object[][] getStringRuntimeParamByNameData() {
 
-        Map<String, String> params = new HashMap<>();
-        params.put(PARAM_NAME, "hello");
+        Map<String, String> presentParam = new HashMap<>();
+        presentParam.put(PARAM_NAME, "hello");
 
-        Optional<String> result = AuthenticatorUtils.getOptionalParamFromRuntimeParams(params, PARAM_NAME);
+        Map<String, String> otherParam = new HashMap<>();
+        otherParam.put("otherParam", "value");
 
-        Assert.assertTrue(result.isPresent());
-        Assert.assertEquals(result.get(), "hello");
+        Map<String, String> blankValue = new HashMap<>();
+        blankValue.put(PARAM_NAME, "");
+
+        Map<String, String> nullValue = new HashMap<>();
+        nullValue.put(PARAM_NAME, null);
+
+        return new Object[][] {
+                {"Returns the value when the param exists in the map",
+                        presentParam, true, "hello"},
+                {"Returns empty when the param key is absent from the map",
+                        otherParam, false, null},
+                {"Returns empty when the runtime params map is null",
+                        null, false, null},
+                {"Returns empty when the runtime params map is empty",
+                        Collections.emptyMap(), false, null},
+                {"Returns empty when the param value is a blank string",
+                        blankValue, false, null},
+                {"Returns empty when the param value stored in the map is null",
+                        nullValue, false, null},
+        };
     }
 
-    @Test(description = "Returns empty when the param key is absent from the map")
-    public void testGetOptionalParam_WhenParamAbsent() {
+    @Test(dataProvider = "getStringRuntimeParamByNameData",
+            description = "getStringRuntimeParamByName returns expected Optional for various inputs")
+    public void testGetStringRuntimeParamByName(String scenario, Map<String, String> params,
+                                                boolean expectPresent, String expectedValue) {
 
-        Map<String, String> params = new HashMap<>();
-        params.put("otherParam", "value");
-
-        Optional<String> result = AuthenticatorUtils.getOptionalParamFromRuntimeParams(params, PARAM_NAME);
-
-        Assert.assertFalse(result.isPresent());
+        Optional<String> result = AuthenticatorUtils.getStringRuntimeParamByName(params, PARAM_NAME);
+        Assert.assertEquals(result.isPresent(), expectPresent, scenario);
+        if (expectPresent) {
+            Assert.assertEquals(result.get(), expectedValue, scenario);
+        }
     }
 
-    @Test(description = "Returns empty when the runtime params map is null")
-    public void testGetOptionalParam_WhenMapIsNull() {
+    @DataProvider(name = "getBooleanRuntimeParamByNameData")
+    public Object[][] getBooleanRuntimeParamByNameData() {
 
-        Optional<String> result = AuthenticatorUtils.getOptionalParamFromRuntimeParams(null, PARAM_NAME);
+        Map<String, String> trueParam = new HashMap<>();
+        trueParam.put(PARAM_NAME, "true");
 
-        Assert.assertFalse(result.isPresent());
+        Map<String, String> falseParam = new HashMap<>();
+        falseParam.put(PARAM_NAME, "false");
+
+        Map<String, String> upperCaseTrueParam = new HashMap<>();
+        upperCaseTrueParam.put(PARAM_NAME, "TRUE");
+
+        Map<String, String> nonBooleanParam = new HashMap<>();
+        nonBooleanParam.put(PARAM_NAME, "yes");
+
+        Map<String, String> otherParam = new HashMap<>();
+        otherParam.put("otherParam", "true");
+
+        return new Object[][] {
+                {"Returns Optional.of(true) when the param value is 'true'",
+                        trueParam, true, Boolean.TRUE},
+                {"Returns Optional.of(false) when the param value is 'false'",
+                        falseParam, true, Boolean.FALSE},
+                {"Returns Optional.of(true) for 'TRUE' (case-insensitive)",
+                        upperCaseTrueParam, true, Boolean.TRUE},
+                {"Returns Optional.of(false) when the param value is a non-boolean string",
+                        nonBooleanParam, true, Boolean.FALSE},
+                {"Returns empty when the runtime params map is null",
+                        null, false, null},
+                {"Returns empty when the runtime params map is empty",
+                        Collections.emptyMap(), false, null},
+                {"Returns empty when the param key is absent",
+                        otherParam, false, null},
+        };
     }
 
-    @Test(description = "Returns empty when the runtime params map is empty")
-    public void testGetOptionalParam_WhenMapIsEmpty() {
+    @Test(dataProvider = "getBooleanRuntimeParamByNameData",
+            description = "getBooleanRuntimeParamByName returns expected Optional for various inputs")
+    public void testGetBooleanRuntimeParamByName(String scenario, Map<String, String> params,
+                                                 boolean expectPresent, Boolean expectedValue) {
 
-        Optional<String> result = AuthenticatorUtils.getOptionalParamFromRuntimeParams(
-                Collections.emptyMap(), PARAM_NAME);
-
-        Assert.assertFalse(result.isPresent());
+        Optional<Boolean> result = AuthenticatorUtils.getBooleanRuntimeParamByName(params, PARAM_NAME);
+        Assert.assertEquals(result.isPresent(), expectPresent, scenario);
+        if (expectPresent) {
+            Assert.assertEquals(result.get(), expectedValue, scenario);
+        }
     }
 
-    @Test(description = "Returns the value when it is a blank string (blank is a valid value)")
-    public void testGetOptionalParam_WhenValueIsBlankString() {
+    @DataProvider(name = "getIntRuntimeParamByNameData")
+    public Object[][] getIntRuntimeParamByNameData() {
 
-        Map<String, String> params = new HashMap<>();
-        params.put(PARAM_NAME, "");
+        Map<String, String> validIntParam = new HashMap<>();
+        validIntParam.put(PARAM_NAME, "42");
 
-        Optional<String> result = AuthenticatorUtils.getOptionalParamFromRuntimeParams(params, PARAM_NAME);
+        Map<String, String> zeroParam = new HashMap<>();
+        zeroParam.put(PARAM_NAME, "0");
 
-        Assert.assertTrue(result.isPresent());
-        Assert.assertEquals(result.get(), "");
+        Map<String, String> negativeParam = new HashMap<>();
+        negativeParam.put(PARAM_NAME, "-5");
+
+        Map<String, String> nonNumericParam = new HashMap<>();
+        nonNumericParam.put(PARAM_NAME, "notAnInt");
+
+        Map<String, String> decimalParam = new HashMap<>();
+        decimalParam.put(PARAM_NAME, "3.14");
+
+        Map<String, String> nullValueParam = new HashMap<>();
+        nullValueParam.put(PARAM_NAME, null);
+
+        Map<String, String> otherParam = new HashMap<>();
+        otherParam.put("otherParam", "10");
+
+        return new Object[][] {
+                {"Returns the parsed integer when the param value is a valid integer string",
+                        validIntParam, true, 42},
+                {"Returns the parsed integer for a zero value",
+                        zeroParam, true, 0},
+                {"Returns the parsed integer for a negative value",
+                        negativeParam, true, -5},
+                {"Returns empty for a non-numeric value",
+                        nonNumericParam, false, 0},
+                {"Returns empty for a decimal string value",
+                        decimalParam, false, 0},
+                {"Returns empty when the runtime params map is null",
+                        null, false, 0},
+                {"Returns empty when the runtime params map is empty",
+                        Collections.emptyMap(), false, 0},
+                {"Returns empty when the param key is absent from the map",
+                        otherParam, false, 0},
+                {"Returns empty when the param value stored in the map is null",
+                        nullValueParam, false, 0},
+        };
     }
 
-    @Test(description = "Returns empty when the param value stored in the map is null")
-    public void testGetOptionalParam_WhenValueIsNull() {
+    @Test(dataProvider = "getIntRuntimeParamByNameData",
+            description = "getIntRuntimeParamByName returns expected OptionalInt for various inputs")
+    public void testGetIntRuntimeParamByName(String scenario, Map<String, String> params,
+                                             boolean expectPresent, int expectedValue) {
 
-        Map<String, String> params = new HashMap<>();
-        params.put(PARAM_NAME, null);
-
-        Optional<String> result = AuthenticatorUtils.getOptionalParamFromRuntimeParams(params, PARAM_NAME);
-
-        Assert.assertFalse(result.isPresent());
-    }
-
-    @Test(description = "Returns Optional.of(true) when the param value is 'true'")
-    public void testGetOptionalBooleanParam_WhenValueIsTrue() {
-
-        Map<String, String> params = new HashMap<>();
-        params.put(PARAM_NAME, "true");
-
-        Optional<Boolean> result =
-                AuthenticatorUtils.getOptionalBooleanParamFromRuntimeParams(params, PARAM_NAME);
-
-        Assert.assertTrue(result.isPresent());
-        Assert.assertTrue(result.get());
-    }
-
-    @Test(description = "Returns Optional.of(false) when the param value is 'false'")
-    public void testGetOptionalBooleanParam_WhenValueIsFalse() {
-
-        Map<String, String> params = new HashMap<>();
-        params.put(PARAM_NAME, "false");
-
-        Optional<Boolean> result =
-                AuthenticatorUtils.getOptionalBooleanParamFromRuntimeParams(params, PARAM_NAME);
-
-        Assert.assertTrue(result.isPresent());
-        Assert.assertFalse(result.get());
-    }
-
-    @Test(description = "Returns Optional.of(true) for 'TRUE' (case-insensitive)")
-    public void testGetOptionalBooleanParam_WhenValueIsTrueUpperCase() {
-
-        Map<String, String> params = new HashMap<>();
-        params.put(PARAM_NAME, "TRUE");
-
-        Optional<Boolean> result =
-                AuthenticatorUtils.getOptionalBooleanParamFromRuntimeParams(params, PARAM_NAME);
-
-        Assert.assertTrue(result.isPresent());
-        Assert.assertTrue(result.get());
-    }
-
-    @Test(description = "Returns Optional.of(false) when the param value is a non-boolean string")
-    public void testGetOptionalBooleanParam_WhenValueIsNonBoolean() {
-
-        Map<String, String> params = new HashMap<>();
-        params.put(PARAM_NAME, "yes");
-
-        // Boolean.parseBoolean("yes") → false
-        Optional<Boolean> result =
-                AuthenticatorUtils.getOptionalBooleanParamFromRuntimeParams(params, PARAM_NAME);
-
-        Assert.assertTrue(result.isPresent());
-        Assert.assertFalse(result.get());
-    }
-
-    @Test(description = "Returns empty when the runtime params map is null")
-    public void testGetOptionalBooleanParam_WhenMapIsNull() {
-
-        Optional<Boolean> result =
-                AuthenticatorUtils.getOptionalBooleanParamFromRuntimeParams(null, PARAM_NAME);
-
-        Assert.assertFalse(result.isPresent());
-    }
-
-    @Test(description = "Returns empty when the runtime params map is empty")
-    public void testGetOptionalBooleanParam_WhenMapIsEmpty() {
-
-        Optional<Boolean> result =
-                AuthenticatorUtils.getOptionalBooleanParamFromRuntimeParams(
-                        Collections.emptyMap(), PARAM_NAME);
-
-        Assert.assertFalse(result.isPresent());
-    }
-
-    @Test(description = "Returns empty when the param key is absent")
-    public void testGetOptionalBooleanParam_WhenParamAbsent() {
-
-        Map<String, String> params = new HashMap<>();
-        params.put("otherParam", "true");
-
-        Optional<Boolean> result =
-                AuthenticatorUtils.getOptionalBooleanParamFromRuntimeParams(params, PARAM_NAME);
-
-        Assert.assertFalse(result.isPresent());
-    }
-
-    @Test(description = "Returns the parsed integer when the param value is a valid integer string")
-    public void testGetOptionalIntParam_WhenValueIsValidInt() {
-
-        Map<String, String> params = new HashMap<>();
-        params.put(PARAM_NAME, "42");
-
-        OptionalInt result = AuthenticatorUtils.getOptionalIntParamFromRuntimeParams(params, PARAM_NAME);
-
-        Assert.assertTrue(result.isPresent());
-        Assert.assertEquals(result.getAsInt(), 42);
-    }
-
-    @Test(description = "Returns the parsed integer for a zero value")
-    public void testGetOptionalIntParam_WhenValueIsZero() {
-
-        Map<String, String> params = new HashMap<>();
-        params.put(PARAM_NAME, "0");
-
-        OptionalInt result = AuthenticatorUtils.getOptionalIntParamFromRuntimeParams(params, PARAM_NAME);
-
-        Assert.assertTrue(result.isPresent());
-        Assert.assertEquals(result.getAsInt(), 0);
-    }
-
-    @Test(description = "Returns the parsed integer for a negative value")
-    public void testGetOptionalIntParam_WhenValueIsNegative() {
-
-        Map<String, String> params = new HashMap<>();
-        params.put(PARAM_NAME, "-5");
-
-        OptionalInt result = AuthenticatorUtils.getOptionalIntParamFromRuntimeParams(params, PARAM_NAME);
-
-        Assert.assertTrue(result.isPresent());
-        Assert.assertEquals(result.getAsInt(), -5);
-    }
-
-    @Test(description = "Returns empty and does NOT throw when the param value is non-numeric")
-    public void testGetOptionalIntParam_WhenValueIsNonNumeric() {
-
-        Map<String, String> params = new HashMap<>();
-        params.put(PARAM_NAME, "notAnInt");
-
-        OptionalInt result = AuthenticatorUtils.getOptionalIntParamFromRuntimeParams(params, PARAM_NAME);
-
-        Assert.assertFalse(result.isPresent());
-    }
-
-    @Test(description = "Returns empty and does NOT throw when the param value is a decimal string")
-    public void testGetOptionalIntParam_WhenValueIsDecimal() {
-
-        Map<String, String> params = new HashMap<>();
-        params.put(PARAM_NAME, "3.14");
-
-        OptionalInt result = AuthenticatorUtils.getOptionalIntParamFromRuntimeParams(params, PARAM_NAME);
-
-        Assert.assertFalse(result.isPresent());
-    }
-
-    @Test(description = "Returns empty when the runtime params map is null")
-    public void testGetOptionalIntParam_WhenMapIsNull() {
-
-        OptionalInt result = AuthenticatorUtils.getOptionalIntParamFromRuntimeParams(null, PARAM_NAME);
-
-        Assert.assertFalse(result.isPresent());
-    }
-
-    @Test(description = "Returns empty when the runtime params map is empty")
-    public void testGetOptionalIntParam_WhenMapIsEmpty() {
-
-        OptionalInt result = AuthenticatorUtils.getOptionalIntParamFromRuntimeParams(
-                Collections.emptyMap(), PARAM_NAME);
-
-        Assert.assertFalse(result.isPresent());
-    }
-
-    @Test(description = "Returns empty when the param key is absent from the map")
-    public void testGetOptionalIntParam_WhenParamAbsent() {
-
-        Map<String, String> params = new HashMap<>();
-        params.put("otherParam", "10");
-
-        OptionalInt result = AuthenticatorUtils.getOptionalIntParamFromRuntimeParams(params, PARAM_NAME);
-
-        Assert.assertFalse(result.isPresent());
-    }
-
-    @Test(description = "Returns empty when the param value stored in the map is null")
-    public void testGetOptionalIntParam_WhenValueIsNull() {
-
-        Map<String, String> params = new HashMap<>();
-        params.put(PARAM_NAME, null);
-
-        OptionalInt result = AuthenticatorUtils.getOptionalIntParamFromRuntimeParams(params, PARAM_NAME);
-
-        Assert.assertFalse(result.isPresent());
+        OptionalInt result = AuthenticatorUtils.getIntRuntimeParamByName(params, PARAM_NAME);
+        Assert.assertEquals(result.isPresent(), expectPresent, scenario);
+        if (expectPresent) {
+            Assert.assertEquals(result.getAsInt(), expectedValue, scenario);
+        }
     }
 
     @Test(description = "Triggers a diagnostic log event for non-numeric values when diagnostic logging is enabled")
-    public void testGetOptionalIntParam_NonNumeric_TriggersDiagnosticLog_WhenEnabled() {
+    public void testGetIntRuntimeParamByNameNonNumericTriggersDiagnosticLogWhenEnabled() {
 
         loggerUtilsMock.when(LoggerUtils::isDiagnosticLogsEnabled).thenReturn(true);
         loggerUtilsMock.when(() -> LoggerUtils.triggerDiagnosticLogEvent(any())).thenAnswer(inv -> null);
-
         Map<String, String> params = new HashMap<>();
         params.put(PARAM_NAME, "bad_value");
-
-        OptionalInt result = AuthenticatorUtils.getOptionalIntParamFromRuntimeParams(params, PARAM_NAME);
-
+        OptionalInt result = AuthenticatorUtils.getIntRuntimeParamByName(params, PARAM_NAME);
         Assert.assertFalse(result.isPresent());
         loggerUtilsMock.verify(() -> LoggerUtils.triggerDiagnosticLogEvent(any()), times(1));
     }
 
     @Test(description = "Does NOT trigger a diagnostic log event for non-numeric values when diagnostic logging is disabled")
-    public void testGetOptionalIntParam_NonNumeric_NoDiagnosticLog_WhenDisabled() {
+    public void testGetIntRuntimeParamByNameNonNumericNoDiagnosticLogWhenDisabled() {
 
         // isDiagnosticLogsEnabled already returns false from setUp().
         Map<String, String> params = new HashMap<>();
         params.put(PARAM_NAME, "bad_value");
-
-        AuthenticatorUtils.getOptionalIntParamFromRuntimeParams(params, PARAM_NAME);
-
+        AuthenticatorUtils.getIntRuntimeParamByName(params, PARAM_NAME);
         loggerUtilsMock.verify(() -> LoggerUtils.triggerDiagnosticLogEvent(any()), never());
     }
 
-    // =========================================================================
-    // logDiagnostic
-    // =========================================================================
+    @DataProvider(name = "triggerDiagnosticLogData")
+    public Object[][] triggerDiagnosticLogData() {
 
-    @Test(description = "triggerDiagnosticLogEvent is called when diagnostic logging is enabled")
-    public void testLogDiagnostic_WhenEnabled_CallsTrigger() {
+        return new Object[][] {
+                {"triggerDiagnosticLogEvent is called when diagnostic logging is enabled",
+                        true, DiagnosticLog.ResultStatus.SUCCESS, 1},
+                {"triggerDiagnosticLogEvent is NOT called when diagnostic logging is disabled",
+                        false, DiagnosticLog.ResultStatus.FAILED, 0},
+        };
+    }
 
-        loggerUtilsMock.when(LoggerUtils::isDiagnosticLogsEnabled).thenReturn(true);
+    @Test(dataProvider = "triggerDiagnosticLogData",
+            description = "triggerDiagnosticLog conditionally calls triggerDiagnosticLogEvent based on logging status")
+    public void testTriggerDiagnosticLog(String scenario, boolean loggingEnabled,
+                                         DiagnosticLog.ResultStatus status, int expectedInvocations) {
+
+        loggerUtilsMock.when(LoggerUtils::isDiagnosticLogsEnabled).thenReturn(loggingEnabled);
         loggerUtilsMock.when(() -> LoggerUtils.triggerDiagnosticLogEvent(any())).thenAnswer(inv -> null);
-
-        AuthenticatorUtils.logDiagnostic(
+        AuthenticatorUtils.triggerDiagnosticLog(
                 "componentId",
                 "actionId",
                 "test message",
-                DiagnosticLog.ResultStatus.SUCCESS,
+                status,
                 DiagnosticLog.LogDetailLevel.APPLICATION);
-
-        loggerUtilsMock.verify(() -> LoggerUtils.triggerDiagnosticLogEvent(any()), times(1));
+        loggerUtilsMock.verify(() -> LoggerUtils.triggerDiagnosticLogEvent(any()), times(expectedInvocations));
     }
 
-    @Test(description = "triggerDiagnosticLogEvent is NOT called when diagnostic logging is disabled")
-    public void testLogDiagnostic_WhenDisabled_DoesNotCallTrigger() {
-
-        // isDiagnosticLogsEnabled returns false from setUp().
-        AuthenticatorUtils.logDiagnostic(
-                "componentId",
-                "actionId",
-                "test message",
-                DiagnosticLog.ResultStatus.FAILED,
-                DiagnosticLog.LogDetailLevel.APPLICATION);
-
-        loggerUtilsMock.verify(() -> LoggerUtils.triggerDiagnosticLogEvent(any()), never());
-    }
-
-    @Test(description = "logDiagnostic does not throw for any ResultStatus value")
-    public void testLogDiagnostic_AllResultStatuses_NoException() {
+    @Test(description = "triggerDiagnosticLog does not throw for any ResultStatus value")
+    public void testTriggerDiagnosticLogAllResultStatusesNoException() {
 
         loggerUtilsMock.when(LoggerUtils::isDiagnosticLogsEnabled).thenReturn(true);
         loggerUtilsMock.when(() -> LoggerUtils.triggerDiagnosticLogEvent(any())).thenAnswer(inv -> null);
-
-        // Should not throw for any status value.
         for (DiagnosticLog.ResultStatus status : DiagnosticLog.ResultStatus.values()) {
-            AuthenticatorUtils.logDiagnostic("c", "a", "msg", status,
+            AuthenticatorUtils.triggerDiagnosticLog("c", "a", "msg", status,
                     DiagnosticLog.LogDetailLevel.APPLICATION);
         }
     }
 
-    @Test(description = "logDiagnostic does not throw for any LogDetailLevel value")
-    public void testLogDiagnostic_AllLogDetailLevels_NoException() {
+    @Test(description = "triggerDiagnosticLog does not throw for any LogDetailLevel value")
+    public void testTriggerDiagnosticLogAllLogDetailLevelsNoException() {
 
         loggerUtilsMock.when(LoggerUtils::isDiagnosticLogsEnabled).thenReturn(true);
         loggerUtilsMock.when(() -> LoggerUtils.triggerDiagnosticLogEvent(any())).thenAnswer(inv -> null);
-
         for (DiagnosticLog.LogDetailLevel level : DiagnosticLog.LogDetailLevel.values()) {
-            AuthenticatorUtils.logDiagnostic("c", "a", "msg",
+            AuthenticatorUtils.triggerDiagnosticLog("c", "a", "msg",
                     DiagnosticLog.ResultStatus.SUCCESS, level);
         }
     }
 }
-

@@ -210,7 +210,7 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
             throws AuthenticationFailedException {
 
         OptionalInt maximumAllowedResendAttemptsLimit =
-                AuthenticatorUtils.getOptionalIntParamFromRuntimeParams(getRuntimeParams(context),
+                AuthenticatorUtils.getIntRuntimeParamByName(getRuntimeParams(context),
                         MAXIMUM_RESEND_LIMIT);
         if (maximumAllowedResendAttemptsLimit.isPresent()) {
             int resendLimit = maximumAllowedResendAttemptsLimit.getAsInt();
@@ -222,7 +222,7 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
                                 "The value should be a non-negative integer.",
                         resendLimit));
             }
-            AuthenticatorUtils.logDiagnostic(getName(),
+            AuthenticatorUtils.triggerDiagnosticLog(getName(),
                     AuthenticatorConstants.LogConstants.ActionID.GET_MAX_RESEND_LIMIT,
                     "Invalid value: " + resendLimit + " for maximum allowed resend attempts limit. " +
                             "The value should be a non-negative integer.",
@@ -243,7 +243,7 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
             throws AuthenticationFailedException {
 
         OptionalInt maximumAllowedRetryAttemptsLimit =
-                AuthenticatorUtils.getOptionalIntParamFromRuntimeParams(getRuntimeParams(context),
+                AuthenticatorUtils.getIntRuntimeParamByName(getRuntimeParams(context),
                         MAXIMUM_ALLOWED_FAILURE_LIMIT);
         if (maximumAllowedRetryAttemptsLimit.isPresent()) {
             int retryLimit = maximumAllowedRetryAttemptsLimit.getAsInt();
@@ -255,7 +255,7 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
                         String.format("Invalid value: %d for maximum allowed retry attempts limit. " +
                                 "The value should be a positive integer.", retryLimit));
             }
-            AuthenticatorUtils.logDiagnostic(getName(),
+            AuthenticatorUtils.triggerDiagnosticLog(getName(),
                     AuthenticatorConstants.LogConstants.ActionID.GET_MAX_FAILURE_LIMIT,
                     "Invalid value: " + retryLimit + " for maximum allowed failure attempts limit. " +
                             "The value should be a positive integer.",
@@ -276,7 +276,7 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
             throws AuthenticationFailedException {
 
         Optional<Boolean> terminateOnResendLimitExceededParam =
-                AuthenticatorUtils.getOptionalBooleanParamFromRuntimeParams(getRuntimeParams(context),
+                AuthenticatorUtils.getBooleanRuntimeParamByName(getRuntimeParams(context),
                         TERMINATE_ON_RESEND_LIMIT_EXCEEDED);
         return terminateOnResendLimitExceededParam.isPresent() && terminateOnResendLimitExceededParam.get();
     }
@@ -1371,7 +1371,7 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
             throws AuthenticationFailedException {
 
         if (isContextBasedOTPResendBlockingEnabled(context)) {
-            OptionalInt maxResendAttemptsFromContext = AuthenticatorUtils.getOptionalIntParamFromRuntimeParams(
+            OptionalInt maxResendAttemptsFromContext = AuthenticatorUtils.getIntRuntimeParamByName(
                     getRuntimeParams(context), MAXIMUM_RESEND_LIMIT);
             return maxResendAttemptsFromContext.isPresent() ?
                     maxResendAttemptsFromContext.getAsInt() : getMaximumResendAttempts(tenantDomain);
@@ -1392,7 +1392,7 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
             throws AuthenticationFailedException {
 
         if (isContextBasedRetryBlockingEnabled(context)) {
-            OptionalInt maxRetryAttemptsFromContext = AuthenticatorUtils.getOptionalIntParamFromRuntimeParams(
+            OptionalInt maxRetryAttemptsFromContext = AuthenticatorUtils.getIntRuntimeParamByName(
                     getRuntimeParams(context), MAXIMUM_ALLOWED_FAILURE_LIMIT);
             return maxRetryAttemptsFromContext.isPresent() ? maxRetryAttemptsFromContext.getAsInt() :
                     Integer.MAX_VALUE;

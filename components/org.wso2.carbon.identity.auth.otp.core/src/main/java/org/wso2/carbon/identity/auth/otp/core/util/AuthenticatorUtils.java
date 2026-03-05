@@ -19,6 +19,8 @@
 package org.wso2.carbon.identity.auth.otp.core.util;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.apache.commons.collections.MapUtils;
+import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.owasp.encoder.Encode;
@@ -27,7 +29,6 @@ import org.wso2.carbon.identity.application.common.model.Property;
 import org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants;
 import org.wso2.carbon.identity.auth.otp.core.internal.AuthenticatorDataHolder;
 import org.wso2.carbon.identity.central.log.mgt.utils.LoggerUtils;
-
 import org.wso2.carbon.utils.DiagnosticLog;
 
 import javax.servlet.http.HttpServletRequest;
@@ -106,15 +107,15 @@ public class AuthenticatorUtils {
      * @param paramName     Parameter name.
      * @return Optional parameter value.
      */
-    public static Optional<String> getOptionalParamFromRuntimeParams(Map<String, String> runtimeParams,
-                                                                     String paramName) {
+    public static Optional<String> getStringRuntimeParamByName(Map<String, String> runtimeParams,
+                                                               String paramName) {
 
-        if (runtimeParams == null || runtimeParams.isEmpty()) {
+        if (MapUtils.isEmpty(runtimeParams)) {
             return Optional.empty();
         }
 
         String value = runtimeParams.get(paramName);
-        if (value != null) {
+        if (StringUtils.isNotBlank(value)) {
             return Optional.of(value);
         }
         return Optional.empty();
@@ -127,10 +128,10 @@ public class AuthenticatorUtils {
      * @param paramName     Parameter name.
      * @return Optional boolean parameter value.
      */
-    public static Optional<Boolean> getOptionalBooleanParamFromRuntimeParams(Map<String, String> runtimeParams,
-                                                                             String paramName) {
+    public static Optional<Boolean> getBooleanRuntimeParamByName(Map<String, String> runtimeParams,
+                                                                 String paramName) {
 
-        Optional<String> paramValue = getOptionalParamFromRuntimeParams(runtimeParams, paramName);
+        Optional<String> paramValue = getStringRuntimeParamByName(runtimeParams, paramName);
         if (paramValue.isPresent()) {
             String value = paramValue.get();
             return Optional.of(Boolean.parseBoolean(value));
@@ -145,19 +146,15 @@ public class AuthenticatorUtils {
      * @param paramName     Parameter name.
      * @return Optional integer parameter value.
      */
-    public static OptionalInt getOptionalIntParamFromRuntimeParams(Map<String, String> runtimeParams,
-                                                                   String paramName) {
+    public static OptionalInt getIntRuntimeParamByName(Map<String, String> runtimeParams,
+                                                       String paramName) {
 
-        if (runtimeParams == null || runtimeParams.isEmpty()) {
-            return OptionalInt.empty();
-        }
-
-        String value = runtimeParams.get(paramName);
-        if (value != null) {
+        Optional<String> value = getStringRuntimeParamByName(runtimeParams, paramName);
+        if (value.isPresent()) {
             try {
-                return OptionalInt.of(Integer.parseInt(value));
+                return OptionalInt.of(Integer.parseInt(value.get()));
             } catch (NumberFormatException e) {
-                logDiagnostic(
+                triggerDiagnosticLog(
                         COMPONENT_ID,
                         AuthenticatorConstants.LogConstants.ActionID.GET_OPTIONAL_INTEGER_RUNTIME_PARAMS,
                         "Unable to parse the parameter: " + paramName + " with value: "
@@ -183,9 +180,9 @@ public class AuthenticatorUtils {
      * @param status         The result status of the operation.
      * @param logDetailLevel The detail level of the log entry.
      */
-    public static void logDiagnostic(String componentId, String actionId, String message,
-                                     DiagnosticLog.ResultStatus status,
-                                     DiagnosticLog.LogDetailLevel logDetailLevel) {
+    public static void triggerDiagnosticLog(String componentId, String actionId, String message,
+                                            DiagnosticLog.ResultStatus status,
+                                            DiagnosticLog.LogDetailLevel logDetailLevel) {
 
         if (LoggerUtils.isDiagnosticLogsEnabled()) {
             LoggerUtils.triggerDiagnosticLogEvent(

@@ -46,6 +46,7 @@ public class AuthenticatorConstants {
     public static final String CODE = "OTPcode";
     public static final String OTP_TOKEN = "otpToken";
     public static final String OTP = "otp";
+    public static final String OTP_RESEND_ATTEMPTS = "otpResendAttempts";
     public static final String ERROR_CODE_MISSING_SMS_SENDER = "40001";
 
     // Query params.
@@ -70,7 +71,6 @@ public class AuthenticatorConstants {
     public static final String MAXIMUM_ALLOWED_FAILURE_LIMIT = "maximumAllowedFailureAttempts";
     public static final String MAXIMUM_RESEND_LIMIT = "maximumAllowedResendAttempts";
     public static final String TERMINATE_ON_RESEND_LIMIT_EXCEEDED = "terminateOnResendLimitExceeded";
-
 
     /**
      * Logging constants for the authenticator.
