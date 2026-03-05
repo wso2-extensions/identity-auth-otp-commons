@@ -35,6 +35,9 @@ public class AuthenticatorConstants {
     public static final String FAILED_LOGIN_ATTEMPTS_CLAIM_URI = "http://wso2.org/claims/identity/failedLoginAttempts";
     public static final String HIDE_USER_EXISTENCE_CONFIG = "LocalAuthenticators.HideUserExistenceOnAuthFlow";
     public static final String MULTIPLE_USERS_ERROR_MESSAGE = "There are more than one user with the provided username";
+    public static final String UNKNOWN_USER = "Unknown user";
+    public static final String DEFAULT_OTP_RESEND_ATTEMPTS_CONTEXT_PROPERTY_NAME = "otpResendAttempts";
+    public static final String DEFAULT_OTP_RETRY_ATTEMPTS_CONTEXT_PROPERTY_NAME = "otpRetryAttempts";
 
     // OTP generation.
     public static final String OTP_NUMERIC_CHAR_SET = "9245378016";
@@ -63,6 +66,27 @@ public class AuthenticatorConstants {
     public static final String RECAPTCHA_PARAM = "&reCaptcha=";
     public static final String USERNAME_PARAM = "&username=";
     public static final String PROPERTY_ACCOUNT_LOCK_ON_FAILURE = "account.lock.handler.enable";
+
+    // Runtime Params.
+    public static final String MAXIMUM_ALLOWED_FAILURE_LIMIT = "maximumAllowedFailureAttempts";
+    public static final String MAXIMUM_RESEND_LIMIT = "maximumAllowedResendAttempts";
+    public static final String TERMINATE_ON_RESEND_LIMIT_EXCEEDED = "terminateOnResendLimitExceeded";
+
+    /**
+     * Logging constants for the authenticator.
+     */
+    public static class LogConstants {
+
+        /**
+         * Action IDs for the authenticator.
+         */
+        public static class ActionID {
+
+            public static final String GET_OPTIONAL_INTEGER_RUNTIME_PARAMS = "get-optional-int-from-runtime-param";
+            public static final String GET_MAX_FAILURE_LIMIT = "get-max-failure-limit";
+            public static final String GET_MAX_RESEND_LIMIT = "get-max-resend-limit";
+        }
+    }
 
     /**
      * User claim related constants.
@@ -142,7 +166,9 @@ public class AuthenticatorConstants {
         ERROR_CODE_ERROR_GETTING_OTP_RESEND_ATTEMPTS("65034",
                 "Error occurred while getting OTP resend attempts for user: %s"),
         ERROR_CODE_ERROR_CHECKING_USER_EXISTENCE("65035",
-                "Error occurred while checking existence of user: %s");
+                "Error occurred while checking existence of user: %s"),
+        ERROR_CODE_RESEND_LIMIT_EXCEEDED("65036", "Resend limit exceeded for user: %s"),
+        ERROR_CODE_RETRY_LIMIT_EXCEEDED("65037", "Retry limit exceeded for user: %s");
 
         private final String code;
         private final String message;

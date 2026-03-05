@@ -31,6 +31,7 @@ import org.wso2.carbon.utils.multitenancy.MultitenantUtils;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.Map;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -115,6 +116,7 @@ public class AbstractOTPAuthenticatorTest {
 
     /**
      * Test implementation of {@link AbstractOTPAuthenticator} with stubbed abstract behaviours.
+     * Includes a configurable runtime params map to simulate authenticator parameters.
      */
     private static class TestOTPAuthenticator extends AbstractOTPAuthenticator {
 
