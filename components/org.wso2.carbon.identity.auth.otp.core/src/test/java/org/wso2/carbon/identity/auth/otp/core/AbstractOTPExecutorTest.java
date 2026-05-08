@@ -181,11 +181,46 @@ public class AbstractOTPExecutorTest {
     @Test
     public void testHandleRetry() throws FlowEngineException {
 
+        // On initial request (STATUS_USER_INPUT_REQUIRED), OTP retry count is set to 1 in the response.
+        response.setResult(STATUS_USER_INPUT_REQUIRED);
         testOTPExecutor.handleRetry(flowExecutionContext, response);
         Assert.assertEquals(response.getContextProperties().get(OTP_RETRY_COUNT), 1);
+        // Simulate the framework restoring the response count back into context for the next request.
+        flowExecutionContext.setProperty(OTP_RETRY_COUNT, 1);
+        // On the first wrong OTP attempt, the count is incremented to 2 in the response.
         response.setResult(STATUS_RETRY);
+        flowExecutionContext.getUserInputData().put(OTPExecutorConstants.OTP, "234567");
         testOTPExecutor.handleRetry(flowExecutionContext, response);
-        Assert.assertEquals(response.getContextProperties().get(OTP_RETRY_COUNT), 1);
+        Assert.assertEquals(response.getContextProperties().get(OTP_RETRY_COUNT), 2);
+    }
+
+    @Test
+    public void testExecuteMaxRetryExceededOnThirdWrongAttempt() {
+
+        // With initial count starting at 1, after 2 wrong attempts the context count is 3.
+        // Submitting a wrong OTP increments it to 4, exceeding maxRetryCount (3) and blocking immediately.
+        OTP otp = new OTP("123456", System.currentTimeMillis(), 60000L);
+        flowExecutionContext.setProperty(OTPExecutorConstants.OTP, otp);
+        flowExecutionContext.setProperty(OTP_RETRY_COUNT, 3);
+        flowExecutionContext.getUserInputData().put(OTPExecutorConstants.OTP, "654321");
+
+        ExecutorResponse executorResponse = testOTPExecutor.execute(flowExecutionContext);
+        Assert.assertEquals(executorResponse.getResult(), STATUS_USER_ERROR);
+        Assert.assertEquals(executorResponse.getErrorMessage(), "{{otp.max.retry.error.message}}");
+    }
+
+    @Test
+    public void testExecuteCorrectOTPOnThirdAttemptShouldPass() {
+
+        // With initial count starting at 1, after 2 wrong attempts the context count is 3.
+        // A correct OTP at this point must still be accepted.
+        OTP otp = new OTP("123456", System.currentTimeMillis(), 60000L);
+        flowExecutionContext.setProperty(OTPExecutorConstants.OTP, otp);
+        flowExecutionContext.setProperty(OTP_RETRY_COUNT, 3);
+        flowExecutionContext.getUserInputData().put(OTPExecutorConstants.OTP, "123456");
+
+        ExecutorResponse executorResponse = testOTPExecutor.execute(flowExecutionContext);
+        Assert.assertEquals(executorResponse.getResult(), STATUS_COMPLETE);
     }
 
     @Test

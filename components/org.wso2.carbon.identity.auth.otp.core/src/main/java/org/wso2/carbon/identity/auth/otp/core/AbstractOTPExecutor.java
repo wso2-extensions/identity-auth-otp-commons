@@ -73,11 +73,6 @@ public abstract class AbstractOTPExecutor extends AuthenticationExecutor {
         ExecutorResponse response = new ExecutorResponse();
         response.setContextProperty(new HashMap<>());
         try {
-            handleMaxRetryCount(flowExecutionContext, response);
-            if (STATUS_USER_ERROR.equals(response.getResult())) {
-                return response;
-            }
-
             if (isInitiateRequest(flowExecutionContext)) {
                 if (validateInitiation(flowExecutionContext)) {
                     initiateExecution(flowExecutionContext, response);
@@ -96,6 +91,11 @@ public abstract class AbstractOTPExecutor extends AuthenticationExecutor {
                 processResponse(flowExecutionContext, response);
             }
             handleRetry(flowExecutionContext, response);
+            /*
+             Check the max retry count after handleRetry so that reaching the max count on the current failed
+             attempt is caught immediately and returns STATUS_USER_ERROR.
+            */
+            handleMaxRetryCount(flowExecutionContext, response);
             return response;
         } catch (FlowEngineException e) {
             logDiagnostic("Error occurred while executing the flow in " + getName(),
@@ -262,7 +262,14 @@ public abstract class AbstractOTPExecutor extends AuthenticationExecutor {
     protected void handleMaxRetryCount(FlowExecutionContext context, ExecutorResponse response)
             throws FlowEngineException {
 
-        if (getCurrentRetryCount(context) >= getMaxRetryCount(context)) {
+        int currentRetryCount;
+        if (response.getContextProperties().get(OTP_RETRY_COUNT) != null) {
+            currentRetryCount = (int) response.getContextProperties().get(OTP_RETRY_COUNT);
+        } else {
+            currentRetryCount = getCurrentRetryCount(context);
+        }
+
+        if (currentRetryCount >= getMaxRetryCount(context)) {
             response.setResult(STATUS_USER_ERROR);
             response.setErrorMessage("{{otp.max.retry.error.message}}");
         }
