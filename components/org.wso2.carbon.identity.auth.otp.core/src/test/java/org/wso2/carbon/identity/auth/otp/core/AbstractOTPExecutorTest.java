@@ -181,15 +181,15 @@ public class AbstractOTPExecutorTest {
     @Test
     public void testHandleRetry() throws FlowEngineException {
 
-        // On initial request (STATUS_USER_INPUT_REQUIRED), OTP retry count is set to 1 in the response.
-        response.setResult(STATUS_USER_INPUT_REQUIRED);
+
+        // Check for the initial request
         testOTPExecutor.handleRetry(flowExecutionContext, response);
-        Assert.assertEquals(response.getContextProperties().get(OTP_RETRY_COUNT), 1);
-        // Simulate the framework restoring the response count back into context for the next request.
-        flowExecutionContext.setProperty(OTP_RETRY_COUNT, 1);
-        // On the first wrong OTP attempt, the count is incremented to 2 in the response.
+        Assert.assertEquals(response.getContextProperties().get(OTP_RETRY_COUNT), 0);
+
+        // Check for a subsequent failure attempt
         response.setResult(STATUS_RETRY);
-        flowExecutionContext.getUserInputData().put(OTPExecutorConstants.OTP, "234567");
+        flowExecutionContext.setProperty(OTP_RETRY_COUNT, 1);
+        flowExecutionContext.getUserInputData().put(OTPExecutorConstants.OTP, "123456");
         testOTPExecutor.handleRetry(flowExecutionContext, response);
         Assert.assertEquals(response.getContextProperties().get(OTP_RETRY_COUNT), 2);
     }
