@@ -321,7 +321,12 @@ public abstract class AbstractOTPExecutor extends AuthenticationExecutor {
             response.getContextProperties().remove(OTPExecutorConstants.OTP_RESEND_COUNT);
             return;
         }
-        response.getContextProperties().put(OTP_RETRY_COUNT, getCurrentRetryCount(flowExecutionContext) + 1);
+
+        if (isInitiateRequest(flowExecutionContext)) {
+            response.getContextProperties().put(OTP_RETRY_COUNT, getCurrentRetryCount(flowExecutionContext));
+        } else {
+            response.getContextProperties().put(OTP_RETRY_COUNT, getCurrentRetryCount(flowExecutionContext) + 1);
+        }
         List<String> data = new ArrayList<>();
         data.add(OTPExecutorConstants.OTP);
         data.add(OTPExecutorConstants.RESEND);
