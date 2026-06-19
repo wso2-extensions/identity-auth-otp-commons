@@ -51,11 +51,14 @@ import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.mockito.ArgumentCaptor;
+
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.CODE;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.DEFAULT_OTP_RESEND_ATTEMPTS_CONTEXT_PROPERTY_NAME;
@@ -436,6 +439,65 @@ public class AbstractOTPAuthenticatorFlowTest {
         return context;
     }
 
+    @Test(description = "process() with INITIAL_OTP scenario and errorCode set redirects with errorCode in URL")
+    public void testProcess_WithErrorCode_RedirectUrlIncludesErrorCode() throws Exception {
+
+        authenticator.setErrorCodeForRedirect("SP-60001");
+
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        HttpServletResponse response = mock(HttpServletResponse.class);
+        when(request.getParameter(CODE)).thenReturn(null);
+        when(request.getParameter(RESEND)).thenReturn(null);
+        when(request.getParameter(USERNAME)).thenReturn(TEST_USER);
+        doNothing().when(response).sendRedirect(anyString());
+
+        AuthenticationContext context = createContextWithAuthenticatedUser(TEST_USER);
+        context.setRetrying(false);
+        context.setCurrentStep(1);
+
+        authenticator.process(request, response, context);
+
+        ArgumentCaptor<String> urlCaptor = ArgumentCaptor.forClass(String.class);
+        verify(response).sendRedirect(urlCaptor.capture());
+        String redirectUrl = urlCaptor.getValue();
+        Assert.assertTrue(redirectUrl.contains("errorCode=SP-60001"),
+                "Redirect URL should contain errorCode=SP-60001, but was: " + redirectUrl);
+        Assert.assertTrue(redirectUrl.contains("authFailure=true"),
+                "Redirect URL should contain authFailure=true (added before errorCode), but was: " + redirectUrl);
+    }
+
+    @Test(description = "process() with retrying context and errorCode does not duplicate authFailure param")
+    public void testProcess_Retrying_WithErrorCode_RetryParamsNotDuplicated() throws Exception {
+
+        authenticator.setErrorCodeForRedirect("SP-60001");
+
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        HttpServletResponse response = mock(HttpServletResponse.class);
+        when(request.getParameter(CODE)).thenReturn(null);
+        when(request.getParameter(RESEND)).thenReturn(null);
+        when(request.getParameter(USERNAME)).thenReturn(TEST_USER);
+        doNothing().when(response).sendRedirect(anyString());
+
+        AuthenticationContext context = createContextWithAuthenticatedUser(TEST_USER);
+        context.setRetrying(true);
+        context.setCurrentStep(1);
+
+        authenticator.process(request, response, context);
+
+        ArgumentCaptor<String> urlCaptor = ArgumentCaptor.forClass(String.class);
+        verify(response).sendRedirect(urlCaptor.capture());
+        String redirectUrl = urlCaptor.getValue();
+        Assert.assertTrue(redirectUrl.contains("errorCode=SP-60001"),
+                "Redirect URL should contain errorCode=SP-60001, but was: " + redirectUrl);
+
+        // authFailure=true should appear exactly once — not duplicated.
+        int firstIndex = redirectUrl.indexOf("authFailure=true");
+        Assert.assertTrue(firstIndex >= 0,
+                "Redirect URL should contain authFailure=true, but was: " + redirectUrl);
+        Assert.assertEquals(redirectUrl.indexOf("authFailure=true", firstIndex + 1), -1,
+                "authFailure=true should appear only once in redirect URL, but was: " + redirectUrl);
+    }
+
     /**
      * Test authenticator that allows configuring canHandle and runtime params for flow tests.
      */
@@ -443,6 +505,7 @@ public class AbstractOTPAuthenticatorFlowTest {
 
         private Map<String, String> runtimeParams = new HashMap<>();
         private boolean canHandle = false;
+        private String errorCodeForRedirect = null;
 
         void setRuntimeParams(Map<String, String> params) {
 
@@ -452,6 +515,17 @@ public class AbstractOTPAuthenticatorFlowTest {
         void setCanHandle(boolean canHandle) {
 
             this.canHandle = canHandle;
+        }
+
+        void setErrorCodeForRedirect(String errorCode) {
+
+            this.errorCodeForRedirect = errorCode;
+        }
+
+        @Override
+        protected String getOTPPageRedirectErrorCode(AuthenticationContext context) {
+
+            return errorCodeForRedirect;
         }
 
         @Override

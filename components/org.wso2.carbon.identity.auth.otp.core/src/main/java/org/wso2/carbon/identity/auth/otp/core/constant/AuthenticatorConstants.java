@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, WSO2 LLC. (https://www.wso2.com).
+ * Copyright (c) 2023-2026, WSO2 LLC. (https://www.wso2.com).
  *
  * WSO2 LLC. licenses this file to you under the Apache License,
  * Version 2.0 (the "License"); you may not use this file except
@@ -61,6 +61,7 @@ public class AuthenticatorConstants {
     public static final String ERROR_USER_RESEND_COUNT_EXCEEDED_QUERY_PARAMS =
             "&authFailure=true&authFailureMsg=resent.count.exceeded";
     public static final String SCREEN_VALUE_QUERY_PARAM = "&screenValue=";
+    public static final String ERROR_CODE_QUERY_PARAM = "&errorCode=";
     public static final String UNLOCK_QUERY_PARAM = "&unlockTime=";
     public static final String MULTI_OPTION_URI_PARAM = "&multiOptionURI=";
     public static final String RECAPTCHA_PARAM = "&reCaptcha=";

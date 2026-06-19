@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025, WSO2 LLC. (http://www.wso2.com).
+ * Copyright (c) 2025-2026, WSO2 LLC. (http://www.wso2.com).
  *
  * WSO2 LLC. licenses this file to you under the Apache License,
  * Version 2.0 (the "License"); you may not use this file except
@@ -47,6 +47,20 @@ import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConst
 public class AbstractOTPAuthenticatorTest {
 
     private static final String ERROR_CODE_PREFIX = "OTP";
+
+    @Test
+    public void testGetOTPPageRedirectErrorCodeDefaultReturnsNull() throws Exception {
+
+        TestOTPAuthenticator otpAuthenticator = new TestOTPAuthenticator();
+        AuthenticationContext context = new AuthenticationContext();
+
+        Method method = AbstractOTPAuthenticator.class
+                .getDeclaredMethod("getOTPPageRedirectErrorCode", AuthenticationContext.class);
+        method.setAccessible(true);
+
+        Object result = method.invoke(otpAuthenticator, context);
+        Assert.assertNull(result, "Default getOTPPageRedirectErrorCode() should return null");
+    }
 
     @Test
     public void testResolveUserFromRequest() throws Exception {

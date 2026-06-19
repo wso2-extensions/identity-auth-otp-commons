@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2025, WSO2 LLC. (http://www.wso2.com).
+ * Copyright (c) 2023-2026, WSO2 LLC. (http://www.wso2.com).
  *
  * WSO2 LLC. licenses this file to you under the Apache License,
  * Version 2.0 (the "License"); you may not use this file except
@@ -138,6 +138,7 @@ import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConst
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.RECAPTCHA_PARAM;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.RESEND;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.RETRY_QUERY_PARAMS;
+import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.ERROR_CODE_QUERY_PARAM;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.SCREEN_VALUE_QUERY_PARAM;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.TERMINATE_ON_RESEND_LIMIT_EXCEEDED;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.UNKNOWN_USER;
@@ -1129,6 +1130,7 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
                 queryParamsBuilder.append(screenValueQueryParam);
             }
         }
+        boolean retryParamsAdded = false;
         if (context.isRetrying() && !Boolean.parseBoolean(request.getParameter(RESEND))) {
             if (isShowAuthFailureReason()) {
                 String remainingNumberOfOtpAttemptsQueryParam = getRemainingNumberOfOtpAttemptsQueryParam();
@@ -1140,10 +1142,18 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
                 }
             }
             queryParamsBuilder.append(RETRY_QUERY_PARAMS);
+            retryParamsAdded = true;
         }
         if (isOTPAsFirstFactor(context)) {
             String captchaParams = getCaptchaParams(request, context, tenantDomain, authenticatedUser);
             queryParamsBuilder.append(captchaParams);
+        }
+        String additionalErrorCode = getOTPPageRedirectErrorCode(context);
+        if (StringUtils.isNotBlank(additionalErrorCode)) {
+            if (!retryParamsAdded) {
+                queryParamsBuilder.append(RETRY_QUERY_PARAMS);
+            }
+            queryParamsBuilder.append(ERROR_CODE_QUERY_PARAM).append(additionalErrorCode);
         }
         try {
             String otpLoginPage = getOTPLoginPageURL(context);
@@ -1939,6 +1949,19 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
     protected abstract String getOTPLoginPageURL(AuthenticationContext context) throws AuthenticationFailedException;
 
     protected String getRemainingNumberOfOtpAttemptsQueryParam() {
+
+        return null;
+    }
+
+    /**
+     * Returns an error code to be appended to the OTP login page redirect URL.
+     * If null is returned, no error code is added. When a non-null value is returned and the retry
+     * params have not yet been added to the URL, they will be added automatically.
+     *
+     * @param context Authentication context.
+     * @return Error code string, or null to skip.
+     */
+    protected String getOTPPageRedirectErrorCode(AuthenticationContext context) throws AuthenticationFailedException {
 
         return null;
     }
