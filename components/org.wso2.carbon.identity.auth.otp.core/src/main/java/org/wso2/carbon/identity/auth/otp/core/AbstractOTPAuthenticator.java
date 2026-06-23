@@ -87,6 +87,7 @@ import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConst
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.AuthenticationScenarios.LOGOUT;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.AuthenticationScenarios.RESEND_OTP;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.AuthenticationScenarios.SUBMIT_OTP;
+import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.COUNT_REINITIATIONS_AS_RESENDS;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.CODE;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.Claims.ACCOUNT_UNLOCK_TIME_CLAIM;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.DEFAULT_OTP_LENGTH;
@@ -133,6 +134,7 @@ import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConst
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.OTP;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.OTP_ALPHA_NUMERIC_CHAR_SET;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.OTP_NUMERIC_CHAR_SET;
+import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.SENT_OTP_TOKEN_TIME_PREFIX;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.DEFAULT_OTP_RESEND_ATTEMPTS_CONTEXT_PROPERTY_NAME;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.DEFAULT_OTP_RETRY_ATTEMPTS_CONTEXT_PROPERTY_NAME;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.RECAPTCHA_PARAM;
@@ -176,6 +178,28 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
                 // Resend OTP and Submit OTP processing will be handled from here.
                 return super.process(request, response, context);
         }
+    }
+
+    /**
+     * Implicit reinitiation: silently re-triggers OTP generation with no submitted CODE, no RESEND
+     * flag, not a retry, and an OTP already issued in this context.
+     */
+    private boolean isImplicitOTPReinitiation(HttpServletRequest request, AuthenticationContext context) {
+
+        return !context.isRetrying()
+                && StringUtils.isBlank(request.getParameter(CODE))
+                && !Boolean.parseBoolean(request.getParameter(RESEND))
+                && context.getProperty(SENT_OTP_TOKEN_TIME_PREFIX + getName()) != null;
+    }
+
+    /**
+     * CountReinitiationsAsResends toggle. Defaults to true when unconfigured.
+     */
+    protected boolean isCountReinitiationsAsResendsEnabled(AuthenticationContext context) {
+
+        Optional<Boolean> param = AuthenticatorUtils.getBooleanRuntimeParamByName(getRuntimeParams(context),
+                COUNT_REINITIATIONS_AS_RESENDS);
+        return !param.isPresent() || param.get();
     }
 
     /**
@@ -431,6 +455,14 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
         if (scenario == INITIAL_OTP || scenario == RESEND_OTP) {
             int allowedResendAttemptsCountForUserBeforeBlock = getMaximumResendAttempts(applicationTenantDomain);
             boolean isUserBasedOTPResendBlockingEnabled = isUserBasedOTPResendBlockingEnabled() && isUserExists;
+            /*
+             * Whether this send consumes a resend slot: always for an explicit RESEND_OTP, and for an implicit
+             * reinitiation when the CountReinitiationsAsResends toggle is on. The context resend counter is
+             * incremented before sending (as with RESEND_OTP); the user-store resend claim is persisted only
+             * after a successful send.
+             */
+            boolean countAgainstResendLimit = scenario == RESEND_OTP
+                    || (isImplicitOTPReinitiation(request, context) && isCountReinitiationsAsResendsEnabled(context));
             if (isUserBasedOTPResendBlockingEnabled) {
                 otpResendClaims = getOTPResendClaims();
 
@@ -470,16 +502,23 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
                         }
                     }
                 }
-                if (scenario == RESEND_OTP) {
+                if (countAgainstResendLimit) {
                     otpResendCount++;
                     shouldUpdateUserClaim = true;
                 }
             }
 
-            if (isOTPResendLimitExceededScenario(scenario, isUserBasedOTPResendBlockingEnabled, context)) {
+            /*
+             * Context-counter limit applies when context-based blocking is in effect (user-based off,
+             * or context-based explicitly enabled). Implicit reinitiation folds into RESEND_OTP accounting.
+             */
+            boolean contextResendBlockingApplicable =
+                    !isUserBasedOTPResendBlockingEnabled || isContextBasedOTPResendBlockingEnabled(context);
+            if (countAgainstResendLimit && contextResendBlockingApplicable
+                    && isOTPResendLimitExceeded(context, applicationTenantDomain)) {
                 handleOTPResendCountExceededScenario(request, response, context, authenticatingUser);
                 return;
-            } else if (scenario == RESEND_OTP) {
+            } else if (countAgainstResendLimit) {
                 updateContextOTPResendCount(context);
             }
             OTP otp = generateOTP(applicationTenantDomain);
@@ -491,6 +530,7 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
              */
             try {
                 sendOtp(mappedLocalUser, otp, isInitialFederationAttempt, request, response, context);
+                context.setProperty(SENT_OTP_TOKEN_TIME_PREFIX + getName(), System.currentTimeMillis());
                 LOG.debug("OTP code was sent successfully.");
             } catch (AuthenticationFailedException exception) {
                 String errorGettingUserClaimErrorCode = getAuthenticatorErrorPrefix() + "-"

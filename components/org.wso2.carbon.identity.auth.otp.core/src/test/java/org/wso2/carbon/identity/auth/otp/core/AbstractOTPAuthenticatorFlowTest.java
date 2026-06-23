@@ -66,6 +66,8 @@ import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConst
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.MAXIMUM_ALLOWED_FAILURE_LIMIT;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.MAXIMUM_RESEND_LIMIT;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.OTP;
+import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.OTP_TOKEN;
+import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.SENT_OTP_TOKEN_TIME_PREFIX;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.RESEND;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.USERNAME;
 
@@ -274,6 +276,59 @@ public class AbstractOTPAuthenticatorFlowTest {
         Assert.assertEquals(context.getProperty(FrameworkConstants.AUTH_ERROR_CODE),
                 FrameworkConstants.ERROR_STATUS_ALLOWED_RETRY_LIMIT_EXCEEDED);
         Assert.assertNotNull(context.getProperty(AbstractApplicationAuthenticator.SKIP_RETRY_FROM_AUTHENTICATOR));
+    }
+
+    @Test(description = "Implicit reinit (no CODE, no RESEND, OTP_TOKEN set, !isRetrying, toggle on) "
+            + "bumps the context resend counter on the context-path")
+    public void testProcess_ImplicitReinit_ContextPath_BumpsResendCount() throws Exception {
+
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        HttpServletResponse response = mock(HttpServletResponse.class);
+        when(request.getParameter(CODE)).thenReturn(null);
+        when(request.getParameter(RESEND)).thenReturn(null);
+        when(request.getParameter(USERNAME)).thenReturn(TEST_USER);
+        doNothing().when(response).sendRedirect(anyString());
+
+        Map<String, String> runtimeParams = new HashMap<>();
+        runtimeParams.put(MAXIMUM_RESEND_LIMIT, "5");
+        runtimeParams.put("CountReinitiationsAsResends", "true");
+        authenticator.setRuntimeParams(runtimeParams);
+
+        AuthenticationContext context = createContextWithAuthenticatedUser(TEST_USER);
+        context.setRetrying(false);
+        context.setCurrentStep(1);
+        context.setProperty(SENT_OTP_TOKEN_TIME_PREFIX + authenticator.getName(), System.currentTimeMillis());
+        context.setProperty(DEFAULT_OTP_RESEND_ATTEMPTS_CONTEXT_PROPERTY_NAME, 0);
+
+        Assert.assertEquals(authenticator.process(request, response, context), AuthenticatorFlowStatus.INCOMPLETE);
+        Assert.assertEquals(authenticator.getCurrentResendAttempt(context), 1,
+                "Implicit reinit should bump context resend counter when CountReinitiationsAsResends is on");
+    }
+
+    @Test(description = "Implicit reinit with toggle off does NOT bump the resend counter")
+    public void testProcess_ImplicitReinit_ToggleOff_NoBump() throws Exception {
+
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        HttpServletResponse response = mock(HttpServletResponse.class);
+        when(request.getParameter(CODE)).thenReturn(null);
+        when(request.getParameter(RESEND)).thenReturn(null);
+        when(request.getParameter(USERNAME)).thenReturn(TEST_USER);
+        doNothing().when(response).sendRedirect(anyString());
+
+        Map<String, String> runtimeParams = new HashMap<>();
+        runtimeParams.put(MAXIMUM_RESEND_LIMIT, "5");
+        runtimeParams.put("CountReinitiationsAsResends", "false");
+        authenticator.setRuntimeParams(runtimeParams);
+
+        AuthenticationContext context = createContextWithAuthenticatedUser(TEST_USER);
+        context.setRetrying(false);
+        context.setCurrentStep(1);
+        context.setProperty(OTP_TOKEN, new OTP("000000", System.currentTimeMillis(), 300_000L));
+        context.setProperty(DEFAULT_OTP_RESEND_ATTEMPTS_CONTEXT_PROPERTY_NAME, 0);
+
+        authenticator.process(request, response, context);
+        Assert.assertEquals(authenticator.getCurrentResendAttempt(context), 0,
+                "Implicit reinit should NOT bump counter when toggle is off");
     }
 
     @Test(description = "process() with RESEND_OTP and resend limit not exceeded increments resend count in initiate path")

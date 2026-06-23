@@ -20,6 +20,7 @@ package org.wso2.carbon.identity.auth.otp.core;
 
 import org.mockito.MockedStatic;
 import org.testng.Assert;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 import org.wso2.carbon.identity.application.authentication.framework.context.AuthenticationContext;
 import org.wso2.carbon.identity.application.authentication.framework.exception.AuthenticationFailedException;
@@ -31,6 +32,7 @@ import org.wso2.carbon.utils.multitenancy.MultitenantUtils;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.Collections;
 import java.util.Map;
 
 import javax.servlet.http.HttpServletRequest;
@@ -128,6 +130,37 @@ public class AbstractOTPAuthenticatorTest {
         }
     }
 
+    @DataProvider
+    public Object[][] countReinitiationsAsResendsDataProvider() {
+
+        return new Object[][]{
+                {null, true},
+                {Collections.emptyMap(), true},
+                {Collections.singletonMap("CountReinitiationsAsResends", "true"), true},
+                {Collections.singletonMap("CountReinitiationsAsResends", "TRUE"), true},
+                {Collections.singletonMap("CountReinitiationsAsResends", "false"), false},
+                {Collections.singletonMap("CountReinitiationsAsResends", "bogus"), false}
+        };
+    }
+
+    @Test(dataProvider = "countReinitiationsAsResendsDataProvider")
+    public void testIsCountReinitiationsAsResendsEnabled(Map<String, String> runtimeParams, boolean expected)
+            throws Exception {
+
+        TestOTPAuthenticator authenticator = new TestOTPAuthenticator() {
+            @Override
+            public Map<String, String> getRuntimeParams(AuthenticationContext context) {
+
+                return runtimeParams;
+            }
+        };
+        Method method = AbstractOTPAuthenticator.class
+                .getDeclaredMethod("isCountReinitiationsAsResendsEnabled", AuthenticationContext.class);
+        method.setAccessible(true);
+        Assert.assertEquals(method.invoke(authenticator, new AuthenticationContext()), expected);
+    }
+
+
     /**
      * Test implementation of {@link AbstractOTPAuthenticator} with stubbed abstract behaviours.
      * Includes a configurable runtime params map to simulate authenticator parameters.
@@ -203,4 +236,5 @@ public class AbstractOTPAuthenticatorTest {
             return "";
         }
     }
+
 }
