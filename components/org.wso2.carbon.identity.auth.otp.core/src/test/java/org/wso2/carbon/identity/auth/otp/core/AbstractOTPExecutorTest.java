@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025, WSO2 LLC. (http://www.wso2.com).
+ * Copyright (c) 2025-2026, WSO2 LLC. (http://www.wso2.com).
  *
  * WSO2 LLC. licenses this file to you under the Apache License,
  * Version 2.0 (the "License"); you may not use this file except
@@ -29,6 +29,7 @@ import org.testng.annotations.Test;
 import org.wso2.carbon.identity.auth.otp.core.constant.OTPExecutorConstants;
 import org.wso2.carbon.identity.auth.otp.core.internal.AuthenticatorDataHolder;
 import org.wso2.carbon.identity.auth.otp.core.model.OTP;
+import org.wso2.carbon.identity.auth.otp.core.model.OTPSendFailureMessage;
 import org.wso2.carbon.identity.central.log.mgt.utils.LoggerUtils;
 import org.wso2.carbon.identity.event.IdentityEventException;
 import org.wso2.carbon.identity.event.event.Event;
@@ -36,14 +37,18 @@ import org.wso2.carbon.identity.event.services.IdentityEventService;
 import org.wso2.carbon.identity.flow.execution.engine.exception.FlowEngineException;
 import org.wso2.carbon.identity.flow.execution.engine.model.ExecutorResponse;
 import org.wso2.carbon.identity.flow.execution.engine.model.FlowExecutionContext;
+import org.wso2.carbon.identity.flow.mgt.model.MessageDTO;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.verify;
@@ -54,7 +59,6 @@ import static org.wso2.carbon.identity.event.IdentityEventConstants.EventPropert
 import static org.wso2.carbon.identity.event.IdentityEventConstants.EventProperty.OTP_STATUS;
 import static org.wso2.carbon.identity.event.IdentityEventConstants.EventProperty.OTP_USED_TIME;
 import static org.wso2.carbon.identity.flow.execution.engine.Constants.ExecutorStatus.STATUS_COMPLETE;
-import static org.wso2.carbon.identity.flow.execution.engine.Constants.ExecutorStatus.STATUS_ERROR;
 import static org.wso2.carbon.identity.flow.execution.engine.Constants.ExecutorStatus.STATUS_RETRY;
 import static org.wso2.carbon.identity.flow.execution.engine.Constants.ExecutorStatus.STATUS_USER_INPUT_REQUIRED;
 import static org.wso2.carbon.identity.flow.execution.engine.Constants.ExecutorStatus.STATUS_USER_ERROR;
@@ -416,5 +420,72 @@ public class AbstractOTPExecutorTest {
         Exception e = new Exception("Test Exception");
         FlowEngineException ex = testOTPExecutor.handleAuthErrorScenario(e);
         Assert.assertTrue(ex.getDescription().contains("Error occurred in TestExecutor"));
+    }
+
+    @Test
+    public void testGetUserFacingOTPSendFailureMessageDefaultReturnsEmpty() {
+
+        Optional<OTPSendFailureMessage> result = testOTPExecutor.getUserFacingOTPSendFailureMessage(
+                new IdentityEventException("EP-001", "boom"), flowExecutionContext);
+        Assert.assertFalse(result.isPresent(),
+                "Default implementation must not surface a user-facing message.");
+    }
+
+    @Test
+    public void testTriggerOTPSuppressesFailureWhenUserFacingMessagePresent() throws Exception {
+
+        IdentityEventService partialService = mock(IdentityEventService.class);
+        doNothing().when(partialService).handleEvent(argThat(evt -> evt != null
+                && TestOTPExecutorConstants.TEST_POST_OTP_GENERATION_EVENT.equals(evt.getEventName())));
+        doThrow(new IdentityEventException("EP-100", "Email provider failure"))
+                .when(partialService).handleEvent(argThat(evt -> evt != null
+                        && "TEST_EVENT".equals(evt.getEventName())));
+        dataHolderMockedStatic.when(AuthenticatorDataHolder::getIdentityEventService).thenReturn(partialService);
+
+        TestOTPExecutor userFacingExecutor = new TestOTPExecutor() {
+            @Override
+            protected Optional<OTPSendFailureMessage> getUserFacingOTPSendFailureMessage(Exception e,
+                                                                                        FlowExecutionContext context) {
+
+                return Optional.of(new OTPSendFailureMessage("i18n.key", "default-msg"));
+            }
+        };
+
+        userFacingExecutor.triggerOTP(OTPExecutorConstants.OTPScenarios.INITIAL_OTP,
+                flowExecutionContext, response);
+
+        Assert.assertNotNull(response.getMessages(), "Response should contain a user-facing message.");
+        Assert.assertEquals(response.getMessages().size(), 1);
+        MessageDTO added = response.getMessages().get(0);
+        Assert.assertEquals(added.getType(), MessageDTO.MessageType.ERROR);
+        Assert.assertEquals(added.getMessage(), "default-msg");
+        Assert.assertEquals(added.getI18nKey(), "i18n.key");
+        // OTP context data should still be populated even though the send failed.
+        Assert.assertNotNull(response.getContextProperties().get(OTPExecutorConstants.OTP));
+
+        // Restore the shared happy-path stub for subsequent tests.
+        dataHolderMockedStatic.when(AuthenticatorDataHolder::getIdentityEventService).thenReturn(identityEventService);
+    }
+
+    @Test(expectedExceptions = FlowEngineException.class)
+    public void testTriggerOTPPropagatesFailureWhenNoUserFacingMessage() throws Exception {
+
+        IdentityEventService partialService = mock(IdentityEventService.class);
+        doNothing().when(partialService).handleEvent(argThat(evt -> evt != null
+                && TestOTPExecutorConstants.TEST_POST_OTP_GENERATION_EVENT.equals(evt.getEventName())));
+        doThrow(new IdentityEventException("EP-100", "Email provider failure"))
+                .when(partialService).handleEvent(argThat(evt -> evt != null
+                        && "TEST_EVENT".equals(evt.getEventName())));
+        dataHolderMockedStatic.when(AuthenticatorDataHolder::getIdentityEventService).thenReturn(partialService);
+
+        try {
+            // Default TestOTPExecutor does not override getUserFacingOTPSendFailureMessage,
+            // so the exception must still abort the flow.
+            testOTPExecutor.triggerOTP(OTPExecutorConstants.OTPScenarios.INITIAL_OTP,
+                    flowExecutionContext, response);
+        } finally {
+            dataHolderMockedStatic.when(AuthenticatorDataHolder::getIdentityEventService)
+                    .thenReturn(identityEventService);
+        }
     }
 }
