@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  ~ Copyright (c) 2023, WSO2 LLC. (http://www.wso2.com).
+  ~ Copyright (c) 2023-2026, WSO2 LLC. (http://www.wso2.com).
   ~
   ~ WSO2 LLC. licenses this file to you under the Apache License,
   ~ Version 2.0 (the "License"); you may not use this file except
@@ -63,6 +63,10 @@
         <dependency>
             <groupId>org.wso2.carbon.identity.framework</groupId>
             <artifactId>org.wso2.carbon.identity.flow.execution.engine</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.wso2.carbon.identity.framework</groupId>
+            <artifactId>org.wso2.carbon.identity.flow.mgt</artifactId>
         </dependency>
         <dependency>
             <groupId>org.wso2.carbon</groupId>
@@ -149,6 +153,8 @@
                             org.wso2.carbon.user.core.*; version="${carbon.kernel.package.import.version.range}",
                             org.wso2.carbon.utils.*; version="${carbon.kernel.package.import.version.range}",
                             org.wso2.carbon.identity.flow.execution.engine.*;
+                            version="${carbon.identity.framework.imp.pkg.version.range}",
+                            org.wso2.carbon.identity.flow.mgt.model;
                             version="${carbon.identity.framework.imp.pkg.version.range}",
                         </Import-Package>
                     </instructions>

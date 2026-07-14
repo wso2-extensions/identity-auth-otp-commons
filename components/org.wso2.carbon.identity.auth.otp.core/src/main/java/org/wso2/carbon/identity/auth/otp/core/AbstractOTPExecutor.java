@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025, WSO2 LLC. (http://www.wso2.com).
+ * Copyright (c) 2025-2026, WSO2 LLC. (http://www.wso2.com).
  *
  * WSO2 LLC. licenses this file to you under the Apache License,
  * Version 2.0 (the "License"); you may not use this file except
@@ -27,6 +27,7 @@ import org.apache.commons.logging.LogFactory;
 import org.wso2.carbon.identity.auth.otp.core.constant.OTPExecutorConstants;
 import org.wso2.carbon.identity.auth.otp.core.internal.AuthenticatorDataHolder;
 import org.wso2.carbon.identity.auth.otp.core.model.OTP;
+import org.wso2.carbon.identity.auth.otp.core.model.OTPSendFailureMessage;
 import org.wso2.carbon.identity.central.log.mgt.utils.LoggerUtils;
 import org.wso2.carbon.identity.event.IdentityEventConstants;
 import org.wso2.carbon.identity.event.IdentityEventException;
@@ -38,6 +39,7 @@ import org.wso2.carbon.identity.flow.execution.engine.exception.FlowEngineServer
 import org.wso2.carbon.identity.flow.execution.engine.graph.AuthenticationExecutor;
 import org.wso2.carbon.identity.flow.execution.engine.model.ExecutorResponse;
 import org.wso2.carbon.identity.flow.execution.engine.model.FlowExecutionContext;
+import org.wso2.carbon.identity.flow.mgt.model.MessageDTO;
 import org.wso2.carbon.utils.DiagnosticLog;
 
 import java.security.SecureRandom;
@@ -407,6 +409,13 @@ public abstract class AbstractOTPExecutor extends AuthenticationExecutor {
         } catch (IdentityEventException e) {
             logDiagnostic("Error occurred while sending the OTP in " + getName(),
                     DiagnosticLog.ResultStatus.FAILED, SEND_OTP);
+            Optional<OTPSendFailureMessage> failureMessage = getUserFacingOTPSendFailureMessage(e, context);
+            if (failureMessage.isPresent()) {
+                OTPSendFailureMessage message = failureMessage.get();
+                response.addMessage(MessageDTO.MessageType.ERROR, message.getDefaultMessage(),
+                        message.getI18nKey());
+                return;
+            }
             throw handleAuthErrorScenario(e, "Error occurred while sending the OTP in " + getName() + ".");
         }
     }
@@ -546,6 +555,21 @@ public abstract class AbstractOTPExecutor extends AuthenticationExecutor {
         int resendCount = getCurrentResendCount(context) + 1;
         context.setProperty(OTPExecutorConstants.OTP_RESEND_COUNT, resendCount);
         response.getContextProperties().put(OTPExecutorConstants.OTP_RESEND_COUNT, resendCount);
+    }
+
+    /**
+     * Resolves a user-facing message for an OTP sending failure that should be surfaced on the OTP
+     * page instead of failing the flow.
+     *
+     * @param e       The exception raised while sending the OTP.
+     * @param context The current flow execution context.
+     * @return A populated {@link OTPSendFailureMessage} when the failure should be shown on the OTP
+     *         page, or {@link Optional#empty()} to let the failure abort the flow.
+     */
+    protected Optional<OTPSendFailureMessage> getUserFacingOTPSendFailureMessage(Exception e,
+                                                                                FlowExecutionContext context) {
+
+        return Optional.empty();
     }
 
     abstract protected Event getSendOTPEvent(OTPExecutorConstants.OTPScenarios otpScenario, OTP otp,
