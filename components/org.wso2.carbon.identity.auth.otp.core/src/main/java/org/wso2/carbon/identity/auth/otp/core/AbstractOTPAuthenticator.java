@@ -668,7 +668,15 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
             throws AuthenticationFailedException {
 
         int allowedResendAttemptsCount = getMaximumResendAttempts(applicationTenantDomain, context);
-        int currentResendAttempt = getCurrentResendAttempt(context);
+        int currentResendAttempt;
+        try {
+            currentResendAttempt = getCurrentResendAttempt(context);
+        } catch (NumberFormatException e) {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Error while parsing the current resend attempt count from context", e);
+            }
+            return true;
+        }
         return currentResendAttempt >= allowedResendAttemptsCount;
     }
 
@@ -687,7 +695,16 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
             // Update Context based retry counter only if context based retry blocking is enabled.
             updateContextOTPRetryCount(context);
             int maxRetryAttempts = getMaximumRetryAttempts(applicationTenantDomain, context);
-            int currentRetryAttempts = getCurrentRetryAttempt(context);
+            int currentRetryAttempts;
+            try {
+                currentRetryAttempts = getCurrentRetryAttempt(context);
+            } catch (NumberFormatException e) {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Error while parsing the current retry attempt count from context", e);
+                }
+                handleOTPRetryCountExceededScenario(context);
+                return;
+            }
             if (currentRetryAttempts >= maxRetryAttempts) {
                 handleOTPRetryCountExceededScenario(context);
             }
@@ -1199,7 +1216,13 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
             throws AuthenticationFailedException {
 
         int maxRetryAttempts = getMaximumRetryAttempts(context.getTenantDomain(), context);
-        int currentRetryAttempts = getCurrentRetryAttempt(context);
+        int currentRetryAttempts;
+        try {
+            currentRetryAttempts = getCurrentRetryAttempt(context);
+        } catch (NumberFormatException e) {
+            throw new AuthenticationFailedException(
+                    "Error while parsing the current retry attempt count from context", e);
+        }
         int remainingRetryAttempts = maxRetryAttempts - currentRetryAttempts;
         // If the remaining retry attempts is less than 0, then return 0.
         return Math.max(remainingRetryAttempts, 0);
@@ -1446,7 +1469,18 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
                 StringUtils.isBlank(context.getProperty(key).toString())) {
             context.setProperty(key, 1);
         } else {
-            context.setProperty(key, (int) context.getProperty(key) + 1);
+            int currentCount;
+            try {
+                currentCount = Integer.parseInt(context.getProperty(key).toString());
+            } catch (NumberFormatException e) {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug(String.format("Error while parsing the current count for context property: %s. " +
+                            "Leaving the value as-is so downstream readers treat the counter as exceeded.",
+                            key), e);
+                }
+                return;
+            }
+            context.setProperty(key, currentCount + 1);
         }
     }
 
