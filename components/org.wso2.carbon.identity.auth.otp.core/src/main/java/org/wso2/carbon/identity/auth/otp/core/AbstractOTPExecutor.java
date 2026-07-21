@@ -89,7 +89,7 @@ public abstract class AbstractOTPExecutor extends AuthenticationExecutor {
                     if (validateInitiation(flowExecutionContext)) {
                         handleResend(flowExecutionContext, response);
                     } else {
-                        response.setResult(STATUS_USER_INPUT_REQUIRED);
+                        handleInvalidResend(flowExecutionContext, response);
                     }
                     return response;
                 }
@@ -177,6 +177,33 @@ public abstract class AbstractOTPExecutor extends AuthenticationExecutor {
         data.add(OTPExecutorConstants.RESEND);
         response.setOptionalData(data);
         triggerOTP(OTPExecutorConstants.OTPScenarios.RESEND_OTP, flowExecutionContext, response);
+        updateResendCount(flowExecutionContext, response);
+    }
+
+    /**
+     * Handles resend requests where initiation cannot be validated (the username does not resolve
+     * to a real user, or the resolved user has no configured channel). To avoid leaking account
+     * state via a distinguishable error/response, this mirrors {@link #handleResend} exactly - same
+     * resend-count tracking, same max-resend terminal error, and the same optionalData/response shape
+     * - but does NOT generate or send an OTP, since there is no valid recipient.
+     *
+     * @param flowExecutionContext Flow execution context.
+     * @param response             Executor response.
+     * @throws FlowEngineException If an error occurs while handling the invalid resend request.
+     */
+    protected void handleInvalidResend(FlowExecutionContext flowExecutionContext, ExecutorResponse response)
+            throws FlowEngineException {
+
+        handleMaxResendCount(flowExecutionContext, response);
+        if (STATUS_USER_ERROR.equals(response.getResult())) {
+            return;
+        }
+
+        response.setResult(STATUS_USER_INPUT_REQUIRED);
+        List<String> data = new ArrayList<>();
+        data.add(OTPExecutorConstants.OTP);
+        data.add(OTPExecutorConstants.RESEND);
+        response.setOptionalData(data);
         updateResendCount(flowExecutionContext, response);
     }
 
