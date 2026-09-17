@@ -409,6 +409,80 @@ public class AbstractOTPAuthenticatorFlowTest {
         Assert.assertEquals(authenticator.getCurrentResendAttempt(context), 0);
     }
 
+    @Test(description = "initiateAuthenticationRequest sets the otpAlreadySentInFlow marker after a successful send")
+    public void testInitiateAuthenticationRequest_SetsOtpAlreadySentInFlowMarker()
+            throws Exception {
+
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        HttpServletResponse response = mock(HttpServletResponse.class);
+        when(request.getParameter(CODE)).thenReturn(null);
+        when(request.getParameter(RESEND)).thenReturn(null);
+        when(request.getParameter(USERNAME)).thenReturn(TEST_USER);
+        doNothing().when(response).sendRedirect(anyString());
+
+        AuthenticationContext context = createContextWithAuthenticatedUser(TEST_USER);
+        context.setRetrying(false);
+        context.setCurrentStep(1);
+
+        authenticator.initiateAuthenticationRequest(request, response, context);
+
+        Assert.assertEquals(context.getProperty(AUTHENTICATOR_NAME + ".otpAlreadySentInFlow"), Boolean.TRUE,
+                "The otpAlreadySentInFlow marker must be set after a successful OTP send.");
+    }
+
+    @Test(description = "An initiate request that resolves to INITIAL_OTP is treated as a resend " +
+            "(and counted) when an OTP has already been sent in the same flow")
+    public void testInitiateAuthenticationRequest_InitialOtpTreatedAsResendWhenAlreadySentInFlow()
+            throws Exception {
+
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        HttpServletResponse response = mock(HttpServletResponse.class);
+        when(request.getParameter(CODE)).thenReturn(null);
+        when(request.getParameter(RESEND)).thenReturn(null);
+        when(request.getParameter(USERNAME)).thenReturn(TEST_USER);
+        doNothing().when(response).sendRedirect(anyString());
+
+        Map<String, String> runtimeParams = new HashMap<>();
+        runtimeParams.put(MAXIMUM_RESEND_LIMIT, "5");
+        authenticator.setRuntimeParams(runtimeParams);
+
+        AuthenticationContext context = createContextWithAuthenticatedUser(TEST_USER);
+        context.setRetrying(false);
+        context.setCurrentStep(1);
+        context.setProperty(DEFAULT_OTP_RESEND_ATTEMPTS_CONTEXT_PROPERTY_NAME, 0);
+
+        // An OTP has already been sent earlier in this same authentication flow.
+        context.setProperty(AUTHENTICATOR_NAME + ".otpAlreadySentInFlow", true);
+
+        authenticator.initiateAuthenticationRequest(request, response, context);
+
+        Assert.assertEquals(authenticator.getCurrentResendAttempt(context), 1,
+                "A look-alike initiate request after an OTP was already sent must be counted as a resend.");
+    }
+
+    @Test(description = "processAuthenticationResponse with valid OTP clears the otpAlreadySentInFlow marker")
+    public void testProcessAuthenticationResponse_ValidOtp_ClearsOtpAlreadySentInFlowMarker()
+            throws Exception {
+
+        String otpValue = "123456";
+        OTP otp = new OTP(otpValue, System.currentTimeMillis(), 300_000L);
+
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        HttpServletResponse response = mock(HttpServletResponse.class);
+        when(request.getParameter(CODE)).thenReturn(otpValue);
+        when(request.getParameter(RESEND)).thenReturn(null);
+
+        AuthenticationContext context = createContextWithAuthenticatedUser(TEST_USER);
+        context.setProperty(OTP, otp);
+        context.setTenantDomain(TENANT_DOMAIN);
+        context.setProperty(AUTHENTICATOR_NAME + ".otpAlreadySentInFlow", true);
+
+        authenticator.processAuthenticationResponse(request, response, context);
+
+        Assert.assertNull(context.getProperty(AUTHENTICATOR_NAME + ".otpAlreadySentInFlow"),
+                "The otpAlreadySentInFlow marker must be cleared after a successful OTP validation.");
+    }
+
     private AuthenticationContext createContextWithAuthenticatedUser(String username) {
 
         AuthenticationContext context = new AuthenticationContext();
