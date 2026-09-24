@@ -302,6 +302,11 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
         String applicationTenantDomain = context.getTenantDomain();
         AuthenticatorConstants.AuthenticationScenarios scenario = resolveScenario(request, context);
 
+        String otpAlreadySentInFlowKey = getName() + ".otpAlreadySentInFlow";
+        if (scenario == INITIAL_OTP && Boolean.TRUE.equals(context.getProperty(otpAlreadySentInFlowKey))) {
+            scenario = RESEND_OTP;
+        }
+
         /*
          * If an invalid user has attempted to log in by submitting an OTP code, or if an invalid user has requested
          * to resend the OTP code, they should be redirected to the OTP login page. This is only valid when OTP is
@@ -492,6 +497,7 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
             try {
                 sendOtp(mappedLocalUser, otp, isInitialFederationAttempt, request, response, context);
                 LOG.debug("OTP code was sent successfully.");
+                context.setProperty(getName() + ".otpAlreadySentInFlow", true);
             } catch (AuthenticationFailedException exception) {
                 String errorGettingUserClaimErrorCode = getAuthenticatorErrorPrefix() + "-"
                         + ERROR_CODE_ERROR_GETTING_USER_CLAIM.getCode();
@@ -607,6 +613,7 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
             }
             resetContextRetryCount(context);
             resetContextResendCount(context);
+            context.removeProperty(getName() + ".otpAlreadySentInFlow");
             publishPostOTPValidatedEvent(otpInContext, authenticatedUserFromContext, true, false, request, context);
             return;
         }
