@@ -33,6 +33,7 @@ import org.wso2.carbon.identity.application.authentication.framework.util.Framew
 import org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants;
 import org.wso2.carbon.identity.auth.otp.core.internal.AuthenticatorDataHolder;
 import org.wso2.carbon.identity.auth.otp.core.model.OTP;
+import org.wso2.carbon.identity.auth.otp.core.model.OTPResendClaims;
 import org.wso2.carbon.identity.application.authentication.framework.AbstractApplicationAuthenticator;
 import org.wso2.carbon.identity.central.log.mgt.utils.LoggerUtils;
 import org.wso2.carbon.identity.core.util.IdentityTenantUtil;
@@ -61,6 +62,7 @@ import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.CODE;
+import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.DEFAULT_OTP_RESEND_ATTEMPTS;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.DEFAULT_OTP_RESEND_ATTEMPTS_CONTEXT_PROPERTY_NAME;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.DEFAULT_OTP_RETRY_ATTEMPTS_CONTEXT_PROPERTY_NAME;
 import static org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants.MAXIMUM_ALLOWED_FAILURE_LIMIT;
@@ -82,7 +84,13 @@ public class AbstractOTPAuthenticatorFlowTest {
 
     private static final int TEST_TENANT_ID = -1234;
 
+    private static final String TEST_RESEND_ATTEMPTS_CLAIM =
+            "http://wso2.org/claims/identity/testOtpResendAttempts";
+    private static final String TEST_LAST_SENT_TIME_CLAIM =
+            "http://wso2.org/claims/identity/testOtpLastSentTime";
+
     private FlowTestOTPAuthenticator authenticator;
+    private UserStoreManager userStoreManager;
     private MockedStatic<LoggerUtils> loggerUtilsMockedStatic;
     private MockedStatic<AuthenticatorDataHolder> dataHolderMockedStatic;
     private MockedStatic<FrameworkUtils> frameworkUtilsMockedStatic;
@@ -106,7 +114,7 @@ public class AbstractOTPAuthenticatorFlowTest {
         dataHolderMockedStatic.when(AuthenticatorDataHolder::getIdentityEventService).thenReturn(identityEventService);
 
         UserRealm userRealm = mock(UserRealm.class);
-        UserStoreManager userStoreManager = mock(UserStoreManager.class);
+        userStoreManager = mock(UserStoreManager.class);
         when(userRealm.getUserStoreManager()).thenReturn(userStoreManager);
         RealmService realmService = mock(RealmService.class);
         when(realmService.getTenantUserRealm(TEST_TENANT_ID)).thenReturn(userRealm);
@@ -357,6 +365,109 @@ public class AbstractOTPAuthenticatorFlowTest {
         Assert.assertEquals(authenticator.getCurrentResendAttempt(context), 1);
     }
 
+    @Test(description = "Once the user-based resend block duration has elapsed, the context resend "
+            + "count is reset too, so the next resend is allowed")
+    public void testInitiateAuthenticationRequest_BlockDurationElapsed_ResetsContextResendCount()
+            throws Exception {
+
+        int resendLimit = 5;
+        int blockDurationMinutes = 10;
+
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        HttpServletResponse response = mock(HttpServletResponse.class);
+        when(request.getParameter(CODE)).thenReturn(null);
+        when(request.getParameter(RESEND)).thenReturn("true");
+        when(request.getParameter(USERNAME)).thenReturn(TEST_USER);
+        doNothing().when(response).sendRedirect(anyString());
+
+        Map<String, String> runtimeParams = new HashMap<>();
+        runtimeParams.put(MAXIMUM_RESEND_LIMIT, String.valueOf(resendLimit));
+        /*
+         * terminateOnResendLimitExceeded is what turns a stale context counter into a hard failure
+         * rather than a retry prompt, as in the reported configuration.
+         */
+        runtimeParams.put(AuthenticatorConstants.TERMINATE_ON_RESEND_LIMIT_EXCEEDED, "true");
+        authenticator.setRuntimeParams(runtimeParams);
+
+        authenticator.enableUserBasedResendBlocking(resendLimit, blockDurationMinutes);
+        // Last resend is older than the block duration, so the window has elapsed.
+        stubResendClaims(String.valueOf(resendLimit),
+                String.valueOf(System.currentTimeMillis() - ((blockDurationMinutes + 1) * 60_000L)));
+
+        AuthenticationContext context = createContextWithAuthenticatedUser(TEST_USER);
+        context.setRetrying(true);
+        context.setCurrentStep(1);
+        // The user walked the counters up to the limit earlier in this same flow.
+        context.setProperty(DEFAULT_OTP_RESEND_ATTEMPTS_CONTEXT_PROPERTY_NAME, resendLimit);
+
+        authenticator.initiateAuthenticationRequest(request, response, context);
+
+        Assert.assertNull(context.getProperty(FrameworkConstants.AUTH_ERROR_CODE),
+                "The resend must not be blocked once the block duration has elapsed.");
+        Assert.assertEquals(authenticator.getCurrentResendAttempt(context), 1,
+                "Context resend count should be reset and then counted as the first resend of the "
+                        + "new allowance.");
+    }
+
+    @Test(description = "While the user-based resend block duration is still running, the context "
+            + "resend count is left alone and the resend stays blocked")
+    public void testInitiateAuthenticationRequest_WithinBlockDuration_DoesNotResetContextResendCount()
+            throws Exception {
+
+        int resendLimit = 5;
+        int blockDurationMinutes = 10;
+
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        HttpServletResponse response = mock(HttpServletResponse.class);
+        when(request.getParameter(CODE)).thenReturn(null);
+        when(request.getParameter(RESEND)).thenReturn("true");
+        when(request.getParameter(USERNAME)).thenReturn(TEST_USER);
+        doNothing().when(response).sendRedirect(anyString());
+
+        Map<String, String> runtimeParams = new HashMap<>();
+        runtimeParams.put(MAXIMUM_RESEND_LIMIT, String.valueOf(resendLimit));
+        runtimeParams.put(AuthenticatorConstants.TERMINATE_ON_RESEND_LIMIT_EXCEEDED, "true");
+        authenticator.setRuntimeParams(runtimeParams);
+
+        authenticator.enableUserBasedResendBlocking(resendLimit, blockDurationMinutes);
+        // Last resend was a moment ago, so the user is still inside the block window.
+        stubResendClaims(String.valueOf(resendLimit), String.valueOf(System.currentTimeMillis()));
+
+        AuthenticationContext context = createContextWithAuthenticatedUser(TEST_USER);
+        context.setRetrying(true);
+        context.setCurrentStep(1);
+        context.setProperty(DEFAULT_OTP_RESEND_ATTEMPTS_CONTEXT_PROPERTY_NAME, resendLimit);
+
+        authenticator.initiateAuthenticationRequest(request, response, context);
+
+        Assert.assertEquals(authenticator.getCurrentResendAttempt(context), resendLimit,
+                "Context resend count must not be reset while the block duration is still running.");
+    }
+
+    /**
+     * Stubs the persisted OTP resend claims returned by the mocked user store.
+     *
+     * @param resendAttempts value of the resend attempts claim.
+     * @param lastSentTime   value of the last-sent-time claim, in millis.
+     */
+    private void stubResendClaims(String resendAttempts, String lastSentTime) throws Exception {
+
+        Map<String, String> claims = new HashMap<>();
+        claims.put(TEST_RESEND_ATTEMPTS_CLAIM, resendAttempts);
+        claims.put(TEST_LAST_SENT_TIME_CLAIM, lastSentTime);
+        when(userStoreManager.getUserClaimValues(anyString(), any(String[].class), any()))
+                .thenAnswer(invocation -> {
+                    String[] requested = invocation.getArgument(1);
+                    Map<String, String> result = new HashMap<>();
+                    for (String uri : requested) {
+                        if (claims.containsKey(uri)) {
+                            result.put(uri, claims.get(uri));
+                        }
+                    }
+                    return result;
+                });
+    }
+
     @Test(description = "processAuthenticationResponse with invalid OTP calls handleInvalidOTPLoginAttempt and increments retry when enabled")
     public void testProcessAuthenticationResponse_InvalidOtp_IncrementsRetryWhenEnabled()
             throws Exception {
@@ -580,10 +691,51 @@ public class AbstractOTPAuthenticatorFlowTest {
         private Map<String, String> runtimeParams = new HashMap<>();
         private boolean canHandle = false;
         private String errorCodeForRedirect = null;
+        private boolean userBasedResendBlockingEnabled = false;
+        private int maximumResendAttempts = DEFAULT_OTP_RESEND_ATTEMPTS;
+        private int otpResendBlockDurationMinutes = 5;
 
         void setRuntimeParams(Map<String, String> params) {
 
             this.runtimeParams = params != null ? params : new HashMap<>();
+        }
+
+        /**
+         * Turns on the claim-persisted, time-windowed resend limiter, as the SMS OTP authenticator
+         * does through its {@code EnableUserBasedResendBlocking} parameter.
+         *
+         * @param maximumResendAttempts        allowed resends before the user is blocked.
+         * @param otpResendBlockDurationMinutes block duration, in minutes.
+         */
+        void enableUserBasedResendBlocking(int maximumResendAttempts, int otpResendBlockDurationMinutes) {
+
+            this.userBasedResendBlockingEnabled = true;
+            this.maximumResendAttempts = maximumResendAttempts;
+            this.otpResendBlockDurationMinutes = otpResendBlockDurationMinutes;
+        }
+
+        @Override
+        protected boolean isUserBasedOTPResendBlockingEnabled() {
+
+            return userBasedResendBlockingEnabled;
+        }
+
+        @Override
+        protected OTPResendClaims getOTPResendClaims() {
+
+            return new OTPResendClaims(TEST_RESEND_ATTEMPTS_CLAIM, TEST_LAST_SENT_TIME_CLAIM);
+        }
+
+        @Override
+        protected int getOTPResendBlockDuration(String tenantDomain) {
+
+            return otpResendBlockDurationMinutes;
+        }
+
+        @Override
+        protected int getMaximumResendAttempts(String tenantDomain) {
+
+            return maximumResendAttempts;
         }
 
         void setCanHandle(boolean canHandle) {

@@ -470,7 +470,14 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
                             handleOTPResendCountExceededScenario(request, response, context, authenticatingUser, false);
                             return;
                         } else {
+                            /*
+                             * The block duration has elapsed, so the user regains the full resend
+                             * allowance. Both counters that guard the resend have to be cleared: the
+                             * persisted one below, and the context one, which is otherwise only
+                             * cleared on a successful OTP validation and would keep the flow blocked.
+                             */
                             otpResendCount = 0;
+                            resetContextResendCount(context);
                             shouldUpdateUserClaim = true;
                         }
                     }
