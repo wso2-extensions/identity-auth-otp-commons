@@ -23,6 +23,7 @@ import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
+import org.wso2.carbon.identity.application.authentication.framework.AbstractApplicationAuthenticator;
 import org.wso2.carbon.identity.application.authentication.framework.context.AuthenticationContext;
 import org.wso2.carbon.identity.application.authentication.framework.exception.AuthenticationFailedException;
 import org.wso2.carbon.identity.application.authentication.framework.model.AuthenticatedUser;
@@ -626,6 +627,77 @@ public class ContextBasedOTPControlTest {
                 new Class[]{AuthenticationContext.class},
                 new Object[]{context});
         Assert.assertEquals(remaining, 0);
+    }
+
+    @Test(description = "updateContextOTPRetryCount preserves a non-numeric counter value (does NOT reset to 1)")
+    public void testUpdateContextOTPRetryCount_PropertyIsGarbage_PreservesValue() {
+
+        AuthenticationContext context = new AuthenticationContext();
+        context.setProperty(DEFAULT_OTP_RETRY_ATTEMPTS_CONTEXT_PROPERTY_NAME, "garbage");
+        authenticator.updateContextOTPRetryCount(context);
+        // Corrupt counter must be preserved so downstream readers fail closed.
+        // Resetting it to 1 would be a security regression (free retry reset on poisoned values).
+        Assert.assertEquals(context.getProperty(DEFAULT_OTP_RETRY_ATTEMPTS_CONTEXT_PROPERTY_NAME), "garbage");
+    }
+
+    @Test(description = "updateContextOTPRetryCount increments a Long-typed counter (parseInt via toString())")
+    public void testUpdateContextOTPRetryCount_PropertyIsLong_Increments() {
+
+        AuthenticationContext context = new AuthenticationContext();
+        context.setProperty(DEFAULT_OTP_RETRY_ATTEMPTS_CONTEXT_PROPERTY_NAME, Long.valueOf(4L));
+        authenticator.updateContextOTPRetryCount(context);
+        Assert.assertEquals(context.getProperty(DEFAULT_OTP_RETRY_ATTEMPTS_CONTEXT_PROPERTY_NAME), 5);
+    }
+
+    @Test(description = "handleInvalidOTPLoginAttempt treats a non-numeric retry-count as limit-exceeded")
+    public void testHandleInvalidOTPLoginAttempt_RetryCountCorrupt_TreatsAsLimitExceeded() throws Exception {
+
+        AuthenticationContext context = createContextWithRuntimeParams(
+                MAXIMUM_ALLOWED_FAILURE_LIMIT, "5");
+        context.setProperty(DEFAULT_OTP_RETRY_ATTEMPTS_CONTEXT_PROPERTY_NAME, "garbage");
+        invokePrivateVoidMethod(
+                "handleInvalidOTPLoginAttempt",
+                new Class[]{AuthenticationContext.class, String.class},
+                new Object[]{context, TENANT_DOMAIN});
+        Assert.assertEquals(context.getProperty(FrameworkConstants.AUTH_ERROR_CODE),
+                FrameworkConstants.ERROR_STATUS_ALLOWED_RETRY_LIMIT_EXCEEDED);
+        Assert.assertEquals(
+                context.getProperty(AbstractApplicationAuthenticator.SKIP_RETRY_FROM_AUTHENTICATOR), true);
+    }
+
+    @Test(description = "isOTPResendLimitExceeded returns true when the resend-count property is non-numeric")
+    public void testIsOTPResendLimitExceeded_ResendCountCorrupt_ReturnsTrue() throws Exception {
+
+        AuthenticationContext context = createContextWithRuntimeParams(MAXIMUM_RESEND_LIMIT, "3");
+        context.setProperty(DEFAULT_OTP_RESEND_ATTEMPTS_CONTEXT_PROPERTY_NAME, "garbage");
+        boolean result = invokePrivateBooleanMethod(
+                "isOTPResendLimitExceeded",
+                new Class[]{AuthenticationContext.class, String.class},
+                new Object[]{context, TENANT_DOMAIN});
+        Assert.assertTrue(result);
+    }
+
+    @Test(description = "getRemainingNumberOfContextBasedRetryAttempts throws AFE (cause=NFE) on corrupt retry-count")
+    public void testGetRemainingNumberOfContextBasedRetryAttempts_RetryCountCorrupt_ThrowsAFE() throws Exception {
+
+        AuthenticationContext context = createContextWithRuntimeParams(
+                MAXIMUM_ALLOWED_FAILURE_LIMIT, "5");
+        context.setProperty(DEFAULT_OTP_RETRY_ATTEMPTS_CONTEXT_PROPERTY_NAME, "garbage");
+        context.setTenantDomain(TENANT_DOMAIN);
+        try {
+            invokePrivateIntMethod(
+                    "getRemainingNumberOfContextBasedRetryAttempts",
+                    new Class[]{AuthenticationContext.class},
+                    new Object[]{context});
+            Assert.fail("Expected AuthenticationFailedException was not thrown");
+        } catch (InvocationTargetException e) {
+            Throwable cause = e.getCause();
+            Assert.assertTrue(cause instanceof AuthenticationFailedException,
+                    "Expected AuthenticationFailedException but got: " + cause.getClass().getName());
+            Assert.assertTrue(cause.getCause() instanceof NumberFormatException,
+                    "Expected NumberFormatException as cause but got: "
+                            + (cause.getCause() == null ? "null" : cause.getCause().getClass().getName()));
+        }
     }
 
     @Test(description = "Both resend and retry limits can be set simultaneously in runtime params")
