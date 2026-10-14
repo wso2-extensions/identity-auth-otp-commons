@@ -93,7 +93,7 @@ public class AbstractOTPProgressiveEnrollmentHandlerTest {
     private static final String VALUE = "+94771234567";
     private static final String OTHER_VALUE = "+94777654321";
     private static final String OTP = "otp";
-    private static final String ENABLED_SETTING = "TestOTP.EnrolUserInAuthenticationFlow";
+    private static final String ENABLED_SETTING = "TestOTP.EnrollUserInAuthenticationFlow";
     private static final String REGEX_SETTING = "TestOTP.ValueRegex";
 
     private TestHandler handler;
@@ -198,7 +198,7 @@ public class AbstractOTPProgressiveEnrollmentHandlerTest {
     @Test
     public void testApplicationCanOptOutFromScript() throws Exception {
 
-        setRuntimeParam(AUTHENTICATOR, EnrollmentConstants.ENROL_USER_IN_AUTHENTICATION_FLOW, "false");
+        setRuntimeParam(AUTHENTICATOR, EnrollmentConstants.ENROLL_USER_IN_AUTHENTICATION_FLOW, "false");
 
         assertFalse(handler.handleInitiation(request, response, context));
         verify(response, never()).sendRedirect(anyString());
@@ -208,7 +208,7 @@ public class AbstractOTPProgressiveEnrollmentHandlerTest {
     public void testApplicationCannotEnableFromScriptWhenDisabledForOrganization() throws Exception {
 
         organizationSettings.put(ENABLED_SETTING, "false");
-        setRuntimeParam(AUTHENTICATOR, EnrollmentConstants.ENROL_USER_IN_AUTHENTICATION_FLOW, "true");
+        setRuntimeParam(AUTHENTICATOR, EnrollmentConstants.ENROLL_USER_IN_AUTHENTICATION_FLOW, "true");
 
         assertFalse(handler.handleInitiation(request, response, context));
         verify(response, never()).sendRedirect(anyString());
@@ -604,7 +604,7 @@ public class AbstractOTPProgressiveEnrollmentHandlerTest {
     public void testApplicationCanOptOutThroughCommonScriptOptions() throws Exception {
 
         setRuntimeParam(FrameworkConstants.JSAttributes.JS_COMMON_OPTIONS,
-                EnrollmentConstants.ENROL_USER_IN_AUTHENTICATION_FLOW, "false");
+                EnrollmentConstants.ENROLL_USER_IN_AUTHENTICATION_FLOW, "false");
 
         assertFalse(handler.handleInitiation(request, response, context));
         verify(response, never()).sendRedirect(anyString());

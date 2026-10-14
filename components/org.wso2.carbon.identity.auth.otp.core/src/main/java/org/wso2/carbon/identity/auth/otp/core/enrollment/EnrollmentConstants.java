@@ -28,7 +28,7 @@ public class EnrollmentConstants {
     }
 
     // Authentication script parameter to opt an application out.
-    public static final String ENROL_USER_IN_AUTHENTICATION_FLOW = "enrolUserInAuthenticationFlow";
+    public static final String ENROLL_USER_IN_AUTHENTICATION_FLOW = "enrollUserInAuthenticationFlow";
 
     // Authentication context properties, prefixed with the authenticator name.
     public static final String AWAITING_VALUE = ".enrollment.awaitingValue";

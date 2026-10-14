@@ -446,8 +446,8 @@ public abstract class AbstractOTPProgressiveEnrollmentHandler {
         // An application can only opt out from the authentication script.
         Map<String, String> runtimeParams = getRuntimeParams(context);
         if (MapUtils.isNotEmpty(runtimeParams)) {
-            String enrolUser = runtimeParams.get(EnrollmentConstants.ENROL_USER_IN_AUTHENTICATION_FLOW);
-            if (StringUtils.isNotBlank(enrolUser) && !Boolean.parseBoolean(enrolUser)) {
+            String enrollUser = runtimeParams.get(EnrollmentConstants.ENROLL_USER_IN_AUTHENTICATION_FLOW);
+            if (StringUtils.isNotBlank(enrollUser) && !Boolean.parseBoolean(enrollUser)) {
                 return false;
             }
         }
