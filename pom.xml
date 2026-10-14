@@ -117,11 +117,6 @@
                 <version>${project.version}</version>
             </dependency>
             <dependency>
-                <groupId>org.wso2.carbon.identity.auth.otp.commons</groupId>
-                <artifactId>org.wso2.carbon.identity.auth.otp.core</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
                 <groupId>org.wso2.carbon.identity.event.handler.notification</groupId>
                 <artifactId>org.wso2.carbon.identity.event.handler.notification</artifactId>
                 <version>${carbon.identity.event.handler.notification.version}</version>
