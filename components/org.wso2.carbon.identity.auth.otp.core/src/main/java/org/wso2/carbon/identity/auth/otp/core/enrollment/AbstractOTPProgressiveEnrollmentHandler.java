@@ -110,6 +110,11 @@ public abstract class AbstractOTPProgressiveEnrollmentHandler {
         if (StringUtils.isNotBlank(getPendingValue(context))) {
             return false;
         }
+        if (getEnrollmentAttempts(context) >= getMaxEnrollmentAttempts()) {
+            // The limit is reached in this flow. Hence, the value is not requested again.
+            redirectToErrorPage(request, response, context, getErrorQueryParams(ATTEMPTS_EXCEEDED_MESSAGE_SUFFIX));
+            return true;
+        }
         String errorQueryParams = (String) context.getProperty(contextKey(ENROLLMENT_ERROR));
         context.removeProperty(contextKey(ENROLLMENT_ERROR));
         redirectToEnrollmentPage(request, response, context, errorQueryParams);
@@ -369,14 +374,16 @@ public abstract class AbstractOTPProgressiveEnrollmentHandler {
     }
 
     /**
-     * Check whether the OTP authenticator is the first factor.
+     * Check whether an authenticator other than an authentication flow handler, such as identifier first, has
+     * authenticated the user in this flow. A value is enrolled only for such a user.
      *
      * @param context AuthenticationContext.
-     * @return True if the authenticator is the first factor.
+     * @return True if the user is authenticated by another authenticator.
      */
-    protected boolean isFirstFactor(AuthenticationContext context) {
+    private boolean isUserAuthenticatedByAnotherAuthenticator(AuthenticationContext context) {
 
-        return context.getCurrentStep() == 1 || AuthenticatorUtils.isPreviousIdPAuthenticationFlowHandler(context);
+        return MapUtils.isNotEmpty(context.getCurrentAuthenticatedIdPs())
+                && !AuthenticatorUtils.isPreviousIdPAuthenticationFlowHandler(context);
     }
 
     /**
@@ -425,7 +432,7 @@ public abstract class AbstractOTPProgressiveEnrollmentHandler {
     private AuthenticatedUser resolveUserEligibleForEnrollment(AuthenticationContext context)
             throws AuthenticationFailedException {
 
-        if (isFirstFactor(context)) {
+        if (!isUserAuthenticatedByAnotherAuthenticator(context)) {
             return null;
         }
         AuthenticatedUser user = getSubjectAuthenticatedUser(context);

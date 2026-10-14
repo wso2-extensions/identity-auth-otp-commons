@@ -24,6 +24,7 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
+import org.wso2.carbon.identity.application.authentication.framework.ApplicationAuthenticator;
 import org.wso2.carbon.identity.application.authentication.framework.AuthenticationFlowHandler;
 import org.wso2.carbon.identity.application.authentication.framework.config.model.AuthenticatorConfig;
 import org.wso2.carbon.identity.application.authentication.framework.config.model.SequenceConfig;
@@ -215,12 +216,24 @@ public class AbstractOTPProgressiveEnrollmentHandlerTest {
     }
 
     @Test
-    public void testNoEnrollmentWhenFirstFactor() throws Exception {
+    public void testNoEnrollmentWithoutPrecedingAuthenticator() throws Exception {
 
+        // The OTP authenticator is the first factor, hence no authenticator has authenticated the user.
         context.setCurrentStep(1);
+        context.setCurrentAuthenticatedIdPs(new HashMap<>());
 
         assertFalse(handler.handleInitiation(request, response, context));
         verify(response, never()).sendRedirect(anyString());
+    }
+
+    @Test
+    public void testEnrollmentAfterAuthenticatorInSameStep() throws Exception {
+
+        // The step is executed again after another authenticator authenticated the user in it.
+        context.setCurrentStep(1);
+
+        assertTrue(handler.handleInitiation(request, response, context));
+        assertTrue(captureRedirectUrl().startsWith(ENROLLMENT_PAGE));
     }
 
     @Test
@@ -392,6 +405,21 @@ public class AbstractOTPProgressiveEnrollmentHandlerTest {
                 "The OTP must not complete the authentication once the enrollment is discontinued.");
         assertEquals(context.getProperty(AUTHENTICATOR + EnrollmentConstants.ENROLLMENT_ATTEMPTS), 2,
                 "The count is kept so that the limit cannot be reset within the flow.");
+    }
+
+    @Test
+    public void testValueIsNotRequestedAgainOnceLimitIsReached() throws Exception {
+
+        handler.maxEnrollmentAttempts = 2;
+        context.setProperty(AUTHENTICATOR + EnrollmentConstants.ENROLLMENT_ATTEMPTS, 2);
+
+        assertTrue(handler.handleInitiation(request, response, context));
+
+        String redirectUrl = captureRedirectUrl();
+        assertTrue(redirectUrl.startsWith(ERROR_PAGE), "The error page is expected: " + redirectUrl);
+        assertTrue(redirectUrl.contains("&authFailure=true&authFailureMsg=" + MESSAGE_PREFIX +
+                ".enrollment.attempts.exceeded"));
+        assertFalse(handler.isAwaitingValue(context), "The value must not be requested again in the flow.");
     }
 
     @Test
@@ -718,6 +746,12 @@ public class AbstractOTPProgressiveEnrollmentHandlerTest {
         context.setSequenceConfig(sequenceConfig);
         context.setCurrentStep(2);
         context.setCurrentAuthenticator(AUTHENTICATOR);
+        // The user is authenticated by an authenticator in the first step, such as username and password.
+        AuthenticatorConfig authenticatorConfig = new AuthenticatorConfig();
+        authenticatorConfig.setApplicationAuthenticator(mock(ApplicationAuthenticator.class));
+        AuthenticatedIdPData idPData = new AuthenticatedIdPData();
+        idPData.setAuthenticators(Collections.singletonList(authenticatorConfig));
+        context.setCurrentAuthenticatedIdPs(new HashMap<>(Collections.singletonMap("LOCAL", idPData)));
         return context;
     }
 
