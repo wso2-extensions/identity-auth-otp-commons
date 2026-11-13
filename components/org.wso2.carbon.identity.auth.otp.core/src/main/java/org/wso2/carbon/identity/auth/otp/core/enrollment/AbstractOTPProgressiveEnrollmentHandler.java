@@ -60,6 +60,7 @@ import static org.wso2.carbon.identity.auth.otp.core.enrollment.EnrollmentConsta
 import static org.wso2.carbon.identity.auth.otp.core.enrollment.EnrollmentConstants.AWAITING_VALUE;
 import static org.wso2.carbon.identity.auth.otp.core.enrollment.EnrollmentConstants.ENROLLMENT_ATTEMPTS;
 import static org.wso2.carbon.identity.auth.otp.core.enrollment.EnrollmentConstants.ENROLLMENT_ERROR;
+import static org.wso2.carbon.identity.auth.otp.core.enrollment.EnrollmentConstants.FAIL_STEP;
 import static org.wso2.carbon.identity.auth.otp.core.enrollment.EnrollmentConstants.ENROLLMENT_FAILED_MESSAGE_SUFFIX;
 import static org.wso2.carbon.identity.auth.otp.core.enrollment.EnrollmentConstants.INVALID_VALUE_MESSAGE_SUFFIX;
 import static org.wso2.carbon.identity.auth.otp.core.enrollment.EnrollmentConstants.OTP_SENT_TO_VALUE;
@@ -104,6 +105,10 @@ public abstract class AbstractOTPProgressiveEnrollmentHandler {
             clearEnrollment(context);
             return false;
         }
+        if (!isRequiredAmrSatisfied(context)) {
+            // The step is failed by the authenticator, so that the authentication script can handle it.
+            return true;
+        }
         if (isValueSubmission(request, context)) {
             return handleSubmittedValue(request, response, context, user);
         }
@@ -119,6 +124,45 @@ public abstract class AbstractOTPProgressiveEnrollmentHandler {
         context.removeProperty(contextKey(ENROLLMENT_ERROR));
         redirectToEnrollmentPage(request, response, context, errorQueryParams);
         return true;
+    }
+
+    /**
+     * Check the AMR values required for enrollment, given in the authentication script with the
+     * {@value FrameworkConstants#REQUIRED_AMR_FOR_ENROLLMENT} parameter. The rule is evaluated by the framework.
+     *
+     * If the rule is not satisfied, the enrollment is cleared and the step is marked to fail, so that the onFail
+     * handler of the script can prompt a required authenticator and then run this authenticator again.
+     *
+     * @param context AuthenticationContext.
+     * @return True if the parameter is not given or the rule is satisfied, false if the step must fail.
+     */
+    public boolean isRequiredAmrSatisfied(AuthenticationContext context) {
+
+        if (FrameworkUtils.isRequiredAmrForEnrollmentSatisfied(context, getRuntimeParams(context),
+                authenticatorName)) {
+            return true;
+        }
+        clearEnrollment(context);
+        context.setProperty(contextKey(FAIL_STEP), true);
+        return false;
+    }
+
+    /**
+     * Check whether the step must be failed since the required AMR for enrollment is not satisfied, and clear the
+     * flag.
+     *
+     * @param context           AuthenticationContext.
+     * @param authenticatorName Name of the authenticator.
+     * @return True if the step must be failed.
+     */
+    public static boolean consumeFailStep(AuthenticationContext context, String authenticatorName) {
+
+        String key = authenticatorName + FAIL_STEP;
+        if (Boolean.TRUE.equals(context.getProperty(key))) {
+            context.removeProperty(key);
+            return true;
+        }
+        return false;
     }
 
     /**

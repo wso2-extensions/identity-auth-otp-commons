@@ -126,6 +126,7 @@ public class AbstractOTPProgressiveEnrollmentHandlerTest {
                 .thenReturn("sessionDataKey=session-data-key");
         frameworkUtils.when(() -> FrameworkUtils.appendQueryParamsStringToUrl(anyString(), anyString()))
                 .thenAnswer(invocation -> invocation.getArgument(0) + "?" + invocation.getArgument(1));
+        setRequiredAmrSatisfied(true);
         identityTenantUtil = mockStatic(IdentityTenantUtil.class);
         identityTenantUtil.when(() -> IdentityTenantUtil.getTenantId(TENANT_DOMAIN)).thenReturn(TENANT_ID);
         loggerUtils = mockStatic(LoggerUtils.class);
@@ -681,6 +682,63 @@ public class AbstractOTPProgressiveEnrollmentHandlerTest {
         when(resendRequest.getParameter(VALUE_PARAM)).thenReturn(VALUE);
         when(resendRequest.getParameter(AuthenticatorConstants.RESEND)).thenReturn("true");
         assertFalse(handler.isValueSubmission(resendRequest, context));
+    }
+
+    @Test
+    public void testStepFailsWhenRequiredAmrIsNotSatisfied() throws Exception {
+
+        setRequiredAmrSatisfied(false);
+
+        assertTrue(handler.handleInitiation(request, response, context));
+        verify(response, never()).sendRedirect(anyString());
+        assertFalse(handler.isAwaitingValue(context), "The value must not be requested before the rule is satisfied.");
+        assertTrue(AbstractOTPProgressiveEnrollmentHandler.consumeFailStep(context, AUTHENTICATOR));
+        assertFalse(AbstractOTPProgressiveEnrollmentHandler.consumeFailStep(context, AUTHENTICATOR),
+                "The fail flag must be cleared once consumed.");
+    }
+
+    @Test
+    public void testSubmittedValueIsRejectedWhenRequiredAmrIsNotSatisfied() throws Exception {
+
+        setRequiredAmrSatisfied(false);
+        setAwaitingValue();
+        when(request.getParameter(VALUE_PARAM)).thenReturn(VALUE);
+
+        assertTrue(handler.handleInitiation(request, response, context));
+        verify(response, never()).sendRedirect(anyString());
+        assertNull(handler.getPendingValue(context), "A value must not be accepted before the rule is satisfied.");
+        assertTrue(AbstractOTPProgressiveEnrollmentHandler.consumeFailStep(context, AUTHENTICATOR));
+    }
+
+    @Test
+    public void testEnrollmentAfterRequiredAmrIsSatisfied() throws Exception {
+
+        setRequiredAmrSatisfied(false);
+        assertTrue(handler.handleInitiation(request, response, context));
+        AbstractOTPProgressiveEnrollmentHandler.consumeFailStep(context, AUTHENTICATOR);
+
+        // The script prompts the required authenticator, then runs the pending authenticator again.
+        setRequiredAmrSatisfied(true);
+        assertTrue(handler.handleInitiation(request, response, context));
+
+        assertTrue(captureRedirectUrl().startsWith(ENROLLMENT_PAGE));
+        assertFalse(AbstractOTPProgressiveEnrollmentHandler.consumeFailStep(context, AUTHENTICATOR));
+    }
+
+    @Test
+    public void testRequiredAmrDoesNotApplyToUserWithValue() throws Exception {
+
+        userClaims.put(VALUE_CLAIM, VALUE);
+        setRequiredAmrSatisfied(false);
+
+        assertFalse(handler.handleInitiation(request, response, context));
+        assertFalse(AbstractOTPProgressiveEnrollmentHandler.consumeFailStep(context, AUTHENTICATOR));
+    }
+
+    private void setRequiredAmrSatisfied(boolean satisfied) {
+
+        frameworkUtils.when(() -> FrameworkUtils.isRequiredAmrForEnrollmentSatisfied(any(), any(), eq(AUTHENTICATOR)))
+                .thenReturn(satisfied);
     }
 
     private void setRuntimeParam(String authenticatorName, String name, String value) {

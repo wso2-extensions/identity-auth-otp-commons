@@ -40,6 +40,7 @@ import org.wso2.carbon.identity.application.common.model.IdentityProvider;
 import org.wso2.carbon.identity.application.common.model.JustInTimeProvisioningConfig;
 import org.wso2.carbon.identity.application.common.model.Property;
 import org.wso2.carbon.identity.auth.otp.core.constant.AuthenticatorConstants;
+import org.wso2.carbon.identity.auth.otp.core.enrollment.AbstractOTPProgressiveEnrollmentHandler;
 import org.wso2.carbon.identity.auth.otp.core.internal.AuthenticatorDataHolder;
 import org.wso2.carbon.identity.auth.otp.core.model.OTP;
 import org.wso2.carbon.identity.auth.otp.core.model.OTPResendClaims;
@@ -167,6 +168,10 @@ public abstract class AbstractOTPAuthenticator extends AbstractApplicationAuthen
                 return AuthenticatorFlowStatus.SUCCESS_COMPLETED;
             case INITIAL_OTP:
                 initiateAuthenticationRequest(request, response, context);
+                if (AbstractOTPProgressiveEnrollmentHandler.consumeFailStep(context, getName())) {
+                    // The required AMR for enrollment is not satisfied. The script handles the failed step.
+                    return AuthenticatorFlowStatus.FAIL_COMPLETED;
+                }
                 return AuthenticatorFlowStatus.INCOMPLETE;
             default:
                 // Resend OTP and Submit OTP processing will be handled from here.

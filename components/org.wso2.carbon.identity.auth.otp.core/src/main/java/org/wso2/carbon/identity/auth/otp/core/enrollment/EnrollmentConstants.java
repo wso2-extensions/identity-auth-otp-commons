@@ -37,6 +37,8 @@ public class EnrollmentConstants {
     public static final String OTP_SENT_TO_VALUE = ".enrollment.otpSentToValue";
     public static final String ENROLLMENT_ATTEMPTS = ".enrollment.attempts";
     public static final String ENROLLMENT_ERROR = ".enrollment.error";
+    // Set by the enrollment handler for the authenticator to fail the step.
+    public static final String FAIL_STEP = ".enrollment.failStep";
 
     // Suffixes of the error message keys, appended to the message key prefix of the channel.
     public static final String INVALID_VALUE_MESSAGE_SUFFIX = ".invalid";
